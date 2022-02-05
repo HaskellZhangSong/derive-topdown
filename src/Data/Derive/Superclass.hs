@@ -83,7 +83,11 @@ isHigherOrderClass ty = do
                     cla <- reify ty
                     case cla of
                         ClassI (ClassD _ _ vars _ _) _ -> do
+#if __GLASGOW_HASKELL__ > 810
+                                                    let (KindedTV _ _ k) = head vars
+#else 
                                                     let (KindedTV _ k) = head vars
+#endif
                                                     if k == StarT
                                                         then return True
                                                         else return False

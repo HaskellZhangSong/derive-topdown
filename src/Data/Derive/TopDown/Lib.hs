@@ -35,12 +35,10 @@ import Data.Data
 -- So if the data type is already an instance of Typeable and not an instance of Data, this might not work.
 isInstance' :: Name -> [Type] -> Q Bool
 isInstance' className tys =
-#ifdef __GLASGOW_HASKELL__
                if className == ''Typeable
                 then
                  isInstance' ''Data tys
                 else
-#endif
                  isInstance className (map (removeExplicitForAllTrans. replacePolyTypeTrans) tys)
 
 replacePolyType :: Type -> Type
@@ -65,9 +63,16 @@ getAllVarNames = everything (++) (mkQ [] getVarName)
 
 constructorTypesVars :: [(Name, Role)] -> Type -> [Type]
 -- get all free variablein a forall type expression.
+#if __GLASGOW_HASKELL__ > 810
+constructorTypesVars n2r  f@(ForallT tvbs _ t) = let scopedVarNames = map (getTVBName.voidTyVarBndrFlag) tvbs in
+                                              filter (\x -> null $ intersect (getAllVarNames x) scopedVarNames)
+                                              (constructorTypesVars n2r t)
+#else
 constructorTypesVars n2r  f@(ForallT tvbs _ t) = let scopedVarNames = map getTVBName tvbs in
                                               filter (\x -> null $ intersect (getAllVarNames x) scopedVarNames)
                                               (constructorTypesVars n2r t)
+
+#endif
 
 constructorTypesVars n2r a@(AppT (VarT tvn) t2) = [a]
 constructorTypesVars n2r  c@(AppT (ConT name) t) = constructorTypesVars n2r t
@@ -108,25 +113,43 @@ getContextType name2role (NormalC name bangtypes) = fmap concat $ mapM (expandSy
 getContextType name2role (RecC name varbangtypes) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map third varbangtypes)
 getContextType name2role (InfixC bangtype1 name bangtype2) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map snd [bangtype1, bangtype2])
 -- need to remove types which contains scoped variables
+#if __GLASGOW_HASKELL__>810
+getContextType name2role (ForallC tvbs _ con) =  let scopedVarNames = map (getTVBName.voidTyVarBndrFlag) tvbs in
+                                         do
+                                           types <- (getContextType name2role) con
+                                           let ty_vars = filter (\ty -> (null $ intersect (getAllVarNames ty) scopedVarNames)) types
+                                           fmap concat $ mapM (expandSynsAndGetContextTypes name2role) ty_vars
+#else
+
 getContextType name2role (ForallC tvbs _ con) =  let scopedVarNames = map getTVBName tvbs in
                                          do
                                            types <- (getContextType name2role) con
                                            let ty_vars = filter (\ty -> (null $ intersect (getAllVarNames ty) scopedVarNames)) types
                                            fmap concat $ mapM (expandSynsAndGetContextTypes name2role) ty_vars
-#if __GLASGOW_HASKELL__>710
+#endif
+#if __GLASGOW_HASKELL__ > 710
 getContextType name2role (GadtC name bangtypes result_type) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map snd bangtypes)
 getContextType name2role (RecGadtC name bangtypes result_type) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map third bangtypes)
 #endif
 
+#if __GLASGOW_HASKELL__ > 810
+getTyVarCons :: ClassName -> TypeName -> StateT [Type] Q ([TyVarBndr ()], [Con])
+#else
 getTyVarCons :: ClassName -> TypeName -> StateT [Type] Q ([TyVarBndr], [Con])
+#endif
 getTyVarCons cn name = do
             info <- lift $ reify name
             case info of
               TyConI dec -> case dec of
-#if __GLASGOW_HASKELL__>710
+#if __GLASGOW_HASKELL__ > 810
+                              DataD _ _ tvbs _ cons _  -> return (map voidTyVarBndrFlag tvbs, cons)
+                              NewtypeD _ _ tvbs _ con _-> return (map voidTyVarBndrFlag tvbs, [con])
+#endif
+#if __GLASGOW_HASKELL__ > 710 && __GLASGOW_HASKELL__ <= 810
                               DataD _ _ tvbs _ cons _  -> return (tvbs, cons)
                               NewtypeD _ _ tvbs _ con _-> return (tvbs, [con])
-#else
+#endif
+#if __GLASGOW_HASKELL__ <= 710 
                               DataD _ _ tvbs cons _  -> return (tvbs, cons)
                               NewtypeD _ _ tvbs con _-> return (tvbs, [con])
 #endif
@@ -138,6 +161,12 @@ getTyVarCons cn name = do
 
 type ClassName = Name
 type TypeName = Name
+
+#if __GLASGOW_HASKELL__ > 810
+voidTyVarBndrFlag :: TyVarBndr flag -> TyVarBndr ()
+voidTyVarBndrFlag (PlainTV n f) = PlainTV n ()
+voidTyVarBndrFlag (KindedTV n f k) = KindedTV n () k
+#endif
 
 -- In the future of GHC, this will be removed.
 -- See https://ghc.haskell.org/trac/ghc/ticket/13324
@@ -158,9 +187,17 @@ generateClassContext classname typename = do
                                   let contextTuple = foldl1 AppT $ (TupleT len) : contexts
                                   return $ Just contextTuple
 
+
+#if __GLASGOW_HASKELL__ > 810
+getTVBName :: TyVarBndr () -> Name
+getTVBName (PlainTV name _)   = name
+getTVBName (KindedTV name _ _) = name
+#else
 getTVBName :: TyVarBndr -> Name
-getTVBName (PlainTV name )   = name
+getTVBName (PlainTV name)   = name
 getTVBName (KindedTV name _) = name
+#endif
+
 
 getTypeNames :: Type -> [Name]
 getTypeNames (ForallT tvbs cxt t) = getTypeNames t
@@ -183,9 +220,16 @@ getCompositeTypeNames (GadtC name bangtype resulttype) = expandSynsAndGetTypeNam
 getCompositeTypeNames (RecGadtC name bangtypes result_type) = expandSynsAndGetTypeNames (map third bangtypes)
 #endif
 
+#if __GLASGOW_HASKELL__ > 810
+tvb2kind :: TyVarBndr a -> Kind
+tvb2kind (PlainTV n _) = StarT
+tvb2kind (KindedTV n _ kind) = kind 
+#else
 tvb2kind :: TyVarBndr -> Kind
 tvb2kind (PlainTV n) = StarT
 tvb2kind (KindedTV n kind) = kind 
+#endif
+
 
 data DecTyType = Data | Newtype | TypeSyn | BuiltIn deriving (Show, Enum, Eq)
 
@@ -194,7 +238,7 @@ decType name = do
          info <- reify name
          case info of
            TyConI dec -> case dec of
-#if __GLASGOW_HASKELL__>710
+#if __GLASGOW_HASKELL__ > 710
               DataD _ _ tvbs _ cons _   -> return Data
               NewtypeD _ _ tvbs _ con _ -> return Newtype
 #else
@@ -211,7 +255,7 @@ getKind name = do
          info <- reify name
          case info of
            TyConI dec -> case dec of
-#if __GLASGOW_HASKELL__>710
+#if __GLASGOW_HASKELL__ > 710
               DataD _ _ tvbs _ cons _   -> case tvbs of
                                                 [] -> return StarT
                                                 xs -> return (foldr1 AppT (map tvb2kind xs))
