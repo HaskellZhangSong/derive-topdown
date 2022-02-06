@@ -45,12 +45,9 @@ genStandaloneDerivingDecl cn tn breaks = do
                       (cn == ''Typeable && isPrimitive) || (cn == ''Typeable && tn == ''Integer)
                      then return []
                      else do
-                       let context = case classContext of
-                                       Nothing -> []
-                                       Just cc -> if isGeneric then [] else [cc]
 #if __GLASGOW_HASKELL__ >= 802
                        declareType <- lift (decType tn)
-                       let standaloneD = \strategy -> [StandaloneDerivD strategy context (AppT (ConT cn) instanceType)]
+                       let standaloneD = \strategy -> [StandaloneDerivD strategy classContext (AppT (ConT cn) instanceType)]
                        let c = if st == Nothing
                                  then standaloneD Nothing
                                  else case declareType of

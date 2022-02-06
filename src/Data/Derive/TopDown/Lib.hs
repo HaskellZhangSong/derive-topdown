@@ -16,7 +16,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax hiding (lift)
 import Data.Generics (mkT,everywhere,mkQ,everything)
 import GHC.Exts
-import Language.Haskell.TH.ExpandSyns (expandSyns)
+import Language.Haskell.TH.ExpandSyns (expandSynsWith,noWarnTypeFamilies)
 import Data.List (nub,intersect,foldr1)
 import Control.Monad.State
 import Control.Monad.Trans
@@ -24,6 +24,9 @@ import Control.Monad.Trans
 import Data.Typeable
 import Data.Data
 #endif
+
+noWarnexpandSynsWith :: Type -> Q Type
+noWarnexpandSynsWith = expandSynsWith noWarnTypeFamilies
 -- `isInstance` in template library does not work with polymorphic types.
 -- The follwoing is an isInstance function with polymorphic type replaced by Any in GHC.Exts so that it can work with polymorphic type.
 -- This is inspired by Ryan Scott
@@ -103,7 +106,7 @@ constructorTypesVars n2r  t = error $ pprint t ++ " is not support"
 
 expandSynsAndGetContextTypes :: [(Name, Role)] -> Type -> Q [Type]
 expandSynsAndGetContextTypes n2r t = do
-                             t' <- expandSyns t
+                             t' <- noWarnexpandSynsWith t
                              return $ (constructorTypesVars n2r  t')
 
 third (a,b,c) = c
@@ -170,7 +173,7 @@ voidTyVarBndrFlag (KindedTV n f k) = KindedTV n () k
 
 -- In the future of GHC, this will be removed.
 -- See https://ghc.haskell.org/trac/ghc/ticket/13324
-generateClassContext :: ClassName -> TypeName -> Q (Maybe Type)
+generateClassContext :: ClassName -> TypeName -> Q Cxt
 generateClassContext classname typename = do
                             (tvbs, cons) <- (evalStateT $ getTyVarCons classname typename) []
                             -- Need to remove phantom types
@@ -179,13 +182,11 @@ generateClassContext classname typename = do
                             types <- fmap nub $ fmap concat $ mapM (getContextType varName2Role) cons
                             let len = length types
                             if len == 0
-                              then return Nothing
+                              then return []
                               else do
                                   -- Eq a, Eq b ...
                                   let contexts = map (AppT (ConT classname)) types
-                                  -- (Eq a, Eq b ...)
-                                  let contextTuple = foldl1 AppT $ (TupleT len) : contexts
-                                  return $ Just contextTuple
+                                  return $ contexts
 
 
 #if __GLASGOW_HASKELL__ > 810
@@ -198,7 +199,6 @@ getTVBName (PlainTV name)   = name
 getTVBName (KindedTV name _) = name
 #endif
 
-
 getTypeNames :: Type -> [Name]
 getTypeNames (ForallT tvbs cxt t) = getTypeNames t
 getTypeNames (ConT n) = [n]
@@ -207,7 +207,7 @@ getTypeNames _ = []
 
 expandSynsAndGetTypeNames :: [Type] -> Q [TypeName]
 expandSynsAndGetTypeNames ts = do
-                          ts' <- mapM expandSyns ts
+                          ts' <- mapM noWarnexpandSynsWith ts
                           return $ concatMap getTypeNames ts'
 
 getCompositeTypeNames :: Con -> Q [TypeName]
