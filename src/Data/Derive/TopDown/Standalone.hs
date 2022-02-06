@@ -63,10 +63,12 @@ genStandaloneDerivingDecl cn tn breaks = do
 #endif
                        modify (instanceType:)
                        names <- lift $ fmap concat $ mapM getCompositeTypeNames cons
+
+                       names' <- lift $ filterM (\x -> fmap not (isTypeFamily x)) names
 #if __GLASGOW_HASKELL__ >= 802
-                       xs <- mapM (\n -> genStandaloneDerivingDecl cn n st breaks) names
+                       xs <- mapM (\n -> genStandaloneDerivingDecl cn n st breaks) names'
 #else
-                       xs <- mapM (\n -> genStandaloneDerivingDecl cn n breaks) names
+                       xs <- mapM (\n -> genStandaloneDerivingDecl cn n breaks) names'
 #endif
                        return $ concat xs ++ c
 

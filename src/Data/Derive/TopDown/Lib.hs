@@ -1,5 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE RankNTypes#-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
+{-# LANGUAGE StandaloneDeriving, FlexibleContexts, UndecidableInstances #-}
+
 module Data.Derive.TopDown.Lib (
   isInstance'
  , generateClassContext
@@ -9,21 +14,28 @@ module Data.Derive.TopDown.Lib (
  , TypeName
  , decType
  , DecTyType(..)
- ,getTypeConstructor
+ , getTypeConstructor
+ , isTypeFamily
  ) where
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax hiding (lift)
-import Data.Generics (mkT,everywhere,mkQ,everything)
+import Data.Generics
 import GHC.Exts
-import Language.Haskell.TH.ExpandSyns (expandSyns)
+import Language.Haskell.TH.ExpandSyns (expandSyns, expandSynsWith,noWarnTypeFamilies)
 import Data.List (nub,intersect,foldr1)
 import Control.Monad.State
 import Control.Monad.Trans
+import Control.Applicative
+import Control.Monad
 #ifdef __GLASGOW_HASKELL__
+import Data.List
 import Data.Typeable
 import Data.Data
 #endif
+
+noWarnexpandSynsWith :: Type -> Q Type
+noWarnexpandSynsWith = expandSynsWith noWarnTypeFamilies
 -- `isInstance` in template library does not work with polymorphic types.
 -- The follwoing is an isInstance function with polymorphic type replaced by Any in GHC.Exts so that it can work with polymorphic type.
 -- This is inspired by Ryan Scott
@@ -61,6 +73,92 @@ getVarName _ = []
 getAllVarNames :: Type -> [Name]
 getAllVarNames = everything (++) (mkQ [] getVarName)
 
+isLeftMostAppTTypeFamily :: Type -> Q Bool
+isLeftMostAppTTypeFamily (ConT n) = isTypeFamily n
+isLeftMostAppTTypeFamily t@(AppT t1 t2) = isLeftMostAppTTypeFamily t1
+isLeftMostAppTTypeFamily _ = return False
+
+getTypeFamilyType :: Type -> Q ([Type], Bool)
+getTypeFamilyType ty = do 
+                  isTF <- isLeftMostAppTTypeFamily ty
+                  if isTF 
+                    then return ([ty], True)
+                    else return ([], False)
+
+everythingMBut :: forall r m. Monad m => (m r -> m r -> m r)
+                          -> (forall a. Data a => a -> m (r, Bool)) 
+                          -> (forall a. Data a => a -> m r)
+everythingMBut k f = go
+      where
+            go :: forall a. Data a => a -> m r
+            go x = do 
+                (res, stop) <- f x
+                if stop 
+                    then return res
+                    else do 
+                      let ls = gmapQ go x :: [m r]
+                      foldl' k (return res) ls
+
+getAllTypeFamilyTypes :: Data a => a -> Q [Type]
+getAllTypeFamilyTypes = everythingMBut (liftA2 (++)) (mkQ (return ([], False)) getTypeFamilyType)
+
+getAllTypeFamilyTypesFromName :: Name -> Q [Type]
+getAllTypeFamilyTypesFromName nm = reify nm 
+                               >>= everywhereM
+                                     (mkM $ noWarnexpandSynsWith) 
+                               >>= getAllTypeFamilyTypes
+                               >>= return.nub
+
+isLeftMostAppTypeVar :: Type -> Bool
+isLeftMostAppTypeVar (AppT (VarT n) t2) = True
+isLeftMostAppTypeVar (AppT t1 t2) = isLeftMostAppTypeVar t1
+isLeftMostAppTypeVar _ = False
+
+getTypeVarAppTypes :: Type -> ([Type], Bool)
+getTypeVarAppTypes t = if isLeftMostAppTypeVar t
+                          then ([t], True)
+                          else ([], False)
+
+getAllTypeVarAppTypes :: Data a => a -> [Type]
+getAllTypeVarAppTypes = everythingBut (++) (mkQ ([], False) getTypeVarAppTypes)
+
+test :: Name -> Q [Type]
+test t = do
+   a <- reify t
+   return $ getAllTypeVarAppTypes a
+
+-- When a type variable is both representational and nominal,
+-- we still need to put it in the context
+getRepresentionalTypeVar :: Type -> Q ([Type], Bool)
+getRepresentionalTypeVar v@(VarT n) = return ([v], True)
+getRepresentionalTypeVar t = do
+                        isTF <- isLeftMostAppTTypeFamily t
+                        if isTF || isLeftMostAppTypeVar t
+                          then return ([], True)
+                          else return ([], False)
+
+getAllRepresentionalTypeVar :: Data a => a -> Q [Type]
+getAllRepresentionalTypeVar = everythingMBut (liftA2 (++)) 
+                                             (mkQ (return ([], False)) 
+                                                  getRepresentionalTypeVar)
+
+-- In the following case, a is representional.
+-- data P a = P (F a) a
+-- type family F x
+getAllRepresentionalTypeVarFromName :: Name -> Q [Type]
+getAllRepresentionalTypeVarFromName nm = do 
+                                  info <- reify nm
+                                  expandInfo <- everywhereM (mkM $ noWarnexpandSynsWith) info
+                                  cons <- return $ listify (\(x :: Con) -> True) expandInfo
+                                  vars <- getAllRepresentionalTypeVar cons
+                                  return $ nub vars
+
+#if __GLASGOW_HASKELL__ > 810
+type TypeVarBind = TyVarBndr ()
+#else
+type TypeVarBind = TyVarBndr
+#endif
+
 constructorTypesVars :: [(Name, Role)] -> Type -> [Type]
 -- get all free variablein a forall type expression.
 #if __GLASGOW_HASKELL__ > 810
@@ -79,6 +177,11 @@ constructorTypesVars n2r  c@(AppT (ConT name) t) = constructorTypesVars n2r t
 constructorTypesVars n2r  c@(AppT t1 t2) = constructorTypesVars n2r  t1 ++ constructorTypesVars n2r t2
 constructorTypesVars n2r  v@(VarT name) = case lookup name n2r of
                                                Just PhantomR -> []
+                                               -- Note: there is not correct to filter out nominal type vars
+                                               -- when a type var is both normal and representational it is 
+                                               -- nominal by GHC, however, we need to fetch this type vars
+                                               -- back when generating the context.
+                                               Just NominalR -> []
                                                _ -> [v]
 constructorTypesVars n2r  c@(ConT name) = []
 constructorTypesVars n2r  (PromotedT name) = []
@@ -103,7 +206,7 @@ constructorTypesVars n2r  t = error $ pprint t ++ " is not support"
 
 expandSynsAndGetContextTypes :: [(Name, Role)] -> Type -> Q [Type]
 expandSynsAndGetContextTypes n2r t = do
-                             t' <- expandSyns t
+                             t' <- noWarnexpandSynsWith t
                              return $ (constructorTypesVars n2r  t')
 
 third (a,b,c) = c
@@ -113,8 +216,8 @@ getContextType name2role (NormalC name bangtypes) = fmap concat $ mapM (expandSy
 getContextType name2role (RecC name varbangtypes) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map third varbangtypes)
 getContextType name2role (InfixC bangtype1 name bangtype2) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map snd [bangtype1, bangtype2])
 -- need to remove types which contains scoped variables
-#if __GLASGOW_HASKELL__>810
-getContextType name2role (ForallC tvbs _ con) =  let scopedVarNames = map (getTVBName.voidTyVarBndrFlag) tvbs in
+#if __GLASGOW_HASKELL__ > 810
+getContextType name2role (ForallC tvbs _ con) = let scopedVarNames = map (getTVBName.voidTyVarBndrFlag) tvbs in
                                          do
                                            types <- (getContextType name2role) con
                                            let ty_vars = filter (\ty -> (null $ intersect (getAllVarNames ty) scopedVarNames)) types
@@ -132,11 +235,7 @@ getContextType name2role (GadtC name bangtypes result_type) = fmap concat $ mapM
 getContextType name2role (RecGadtC name bangtypes result_type) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map third bangtypes)
 #endif
 
-#if __GLASGOW_HASKELL__ > 810
-getTyVarCons :: ClassName -> TypeName -> StateT [Type] Q ([TyVarBndr ()], [Con])
-#else
-getTyVarCons :: ClassName -> TypeName -> StateT [Type] Q ([TyVarBndr], [Con])
-#endif
+getTyVarCons :: ClassName -> TypeName -> StateT [Type] Q ([TypeVarBind], [Con])
 getTyVarCons cn name = do
             info <- lift $ reify name
             case info of
@@ -153,7 +252,8 @@ getTyVarCons cn name = do
                               DataD _ _ tvbs cons _  -> return (tvbs, cons)
                               NewtypeD _ _ tvbs con _-> return (tvbs, [con])
 #endif
-                              TySynD name tvbs t -> error $ show name ++ " is a type synonym and -XTypeSynonymInstances is not supported. If you did not derive it then This is a bug, please report this bug to the author of this package."
+                              TySynD name tvbs t -> error $ show name ++ " is a type synonym and `TypeSynonymInstances' is not supported. "
+                                  ++ "If you did not derive it then this is a bug, please report this bug to the author of `derive-topdown' package."
                               x -> do
                                  tys <- get
                                  error $ pprint x ++ " is not a data or newtype definition. " ++ show "Stack: " ++ show tys
@@ -161,6 +261,50 @@ getTyVarCons cn name = do
 
 type ClassName = Name
 type TypeName = Name
+
+getDecTyVarBndrs :: Dec -> [TypeVarBind]
+getDecTyVarBndrs (DataD _ _ bnds _ _ _)                            = bnds
+getDecTyVarBndrs (NewtypeD _ _ bnds _ _ _)                         = bnds
+getDecTyVarBndrs (TySynD _ bnds _)                                 = bnds
+getDecTyVarBndrs (OpenTypeFamilyD (TypeFamilyHead _ bnds _ _))     = bnds
+getDecTyVarBndrs (ClosedTypeFamilyD (TypeFamilyHead _ bnds _ _) _) = bnds
+getDecTyVarBndrs _                                                 = []
+
+getTypeNameTyVarBndrs :: TypeName -> Q [TypeVarBind]
+getTypeNameTyVarBndrs tn = do
+            info <- reify tn
+            case info of
+              TyConI dec    -> return (getDecTyVarBndrs dec)
+              FamilyI dec _ -> return (getDecTyVarBndrs dec)
+
+isVarBindPolyKinded :: TypeVarBind -> Bool
+#if __GLASGOW_HASKELL__ > 810
+isVarBindPolyKinded (KindedTV n f (VarT t)) = True
+#else 
+isVarBindPolyKinded (KindedTV n (VarT t)) = True
+#endif  
+isVarBindPolyKinded _ = False
+
+getTypeNameRoles :: TypeName -> Q [Role]
+getTypeNameRoles tn = do
+              vars <- getTypeNameTyVarBndrs tn
+              roles <- reifyRoles tn
+              let polyKindedBndVar = filter isVarBindPolyKinded vars
+              -- I write this due to a possible bug of GHC.
+              -- With PolyKinds extension, GHC may return more 
+              -- roles than expected with reifyRoles function.
+              -- See: https://gitlab.haskell.org/ghc/ghc/-/issues/21046
+              if length vars < length roles
+                then return (drop (length polyKindedBndVar) roles)
+                else return roles
+
+isTypeFamily :: TypeName -> Q Bool
+isTypeFamily tn = do
+                info <- reify tn
+                case info of
+                  FamilyI (OpenTypeFamilyD hd) insts -> return True
+                  FamilyI (ClosedTypeFamilyD hd eqs) insts -> return True 
+                  _ -> return False
 
 #if __GLASGOW_HASKELL__ > 810
 voidTyVarBndrFlag :: TyVarBndr flag -> TyVarBndr ()
@@ -173,16 +317,18 @@ voidTyVarBndrFlag (KindedTV n f k) = KindedTV n () k
 generateClassContext :: ClassName -> TypeName -> Q (Maybe Type)
 generateClassContext classname typename = do
                             (tvbs, cons) <- (evalStateT $ getTyVarCons classname typename) []
-                            -- Need to remove phantom types
-                            roles <- reifyRoles typename
+                            -- Need to remove phantom types, needs GHC 7.2
+                            roles <- getTypeNameRoles typename
                             let varName2Role = zip (map getTVBName tvbs) roles
-                            types <- fmap nub $ fmap concat $ mapM (getContextType varName2Role) cons
-                            let len = length types
+                            reTyVars <- getAllRepresentionalTypeVarFromName typename
+                            tfs <- getAllTypeFamilyTypesFromName typename
+                            types <- fmap (nub. concat) $ mapM (getContextType varName2Role) cons
+                            let len = length $ types ++ tfs
                             if len == 0
                               then return Nothing
                               else do
                                   -- Eq a, Eq b ...
-                                  let contexts = map (AppT (ConT classname)) types
+                                  let contexts = map (AppT (ConT classname)) (types ++ tfs ++ reTyVars)
                                   -- (Eq a, Eq b ...)
                                   let contextTuple = foldl1 AppT $ (TupleT len) : contexts
                                   return $ Just contextTuple
@@ -215,7 +361,7 @@ getCompositeTypeNames (NormalC n bts) = expandSynsAndGetTypeNames (map snd bts)
 getCompositeTypeNames (RecC n vbts) = expandSynsAndGetTypeNames (map third vbts)
 getCompositeTypeNames (InfixC st1 n st2) = expandSynsAndGetTypeNames (map snd [st1 , st2])
 getCompositeTypeNames (ForallC bind context con) = getCompositeTypeNames con
-#if __GLASGOW_HASKELL__> 710
+#if __GLASGOW_HASKELL__ > 710
 getCompositeTypeNames (GadtC name bangtype resulttype) = expandSynsAndGetTypeNames (map snd bangtype)
 getCompositeTypeNames (RecGadtC name bangtypes result_type) = expandSynsAndGetTypeNames (map third bangtypes)
 #endif
