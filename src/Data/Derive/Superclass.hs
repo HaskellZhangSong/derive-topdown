@@ -130,12 +130,10 @@ deriving_superclasses' cn tn = do
                     isCnHighOrderClass <- lift $ isHigherOrderClass cn
                     classContext <- if isCnHighOrderClass
                                         then lift $ generateClassContext cn tn
-                                        else return Nothing
+                                        else return []
                     --
-                    let Just a = classContext
                     let typeNames = map getTVBName tvbs
                     isIns <- lift $ isInstance' cn [ConT tn]
-                    let context = maybeToList classContext
                     if (isIns || elem tp types)
                         then return []
                         else
@@ -144,7 +142,7 @@ deriving_superclasses' cn tn = do
 #if __GLASGOW_HASKELL__ >= 802
                                                             st
 #endif
-                                                            context tp]
+                                                            classContext tp]
 
                             modify (tp:)
                             ci <- lift $ reify cn

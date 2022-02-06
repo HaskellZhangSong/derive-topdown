@@ -28,13 +28,13 @@ genEmptyInstanceDecl cn tn = do
                    if isMember || elem instanceType table || (isPrimitive && isGeneric)
                      then return []
                      else do
-                       let context = case classContext of
-                                       Nothing -> []
-                                       Just cc -> if isGeneric then [] else [cc]
+                      --  let context = case classContext of
+                      --                  Nothing -> []
+                      --                  Just cc -> if isGeneric then [] else [cc]
 #if __GLASGOW_HASKELL__> 710                                       
-                       let c = [InstanceD Nothing context (AppT (ConT cn) instanceType) []]
+                       let c = [InstanceD Nothing classContext (AppT (ConT cn) instanceType) []]
 #else
-                       let c = [InstanceD context (AppT (ConT cn) instanceType) []]
+                       let c = [InstanceD classContext (AppT (ConT cn) instanceType) []]
 #endif
                        modify (instanceType:)
                        names <- lift $ fmap concat $ mapM getCompositeTypeNames cons

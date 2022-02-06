@@ -22,7 +22,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax hiding (lift)
 import Data.Generics
 import GHC.Exts
-import Language.Haskell.TH.ExpandSyns (expandSyns, expandSynsWith,noWarnTypeFamilies)
+import Language.Haskell.TH.ExpandSyns (expandSynsWith,noWarnTypeFamilies)
 import Data.List (nub,intersect,foldr1)
 import Control.Monad.State
 import Control.Monad.Trans
@@ -314,7 +314,7 @@ voidTyVarBndrFlag (KindedTV n f k) = KindedTV n () k
 
 -- In the future of GHC, this will be removed.
 -- See https://ghc.haskell.org/trac/ghc/ticket/13324
-generateClassContext :: ClassName -> TypeName -> Q (Maybe Type)
+generateClassContext :: ClassName -> TypeName -> Q Cxt
 generateClassContext classname typename = do
                             (tvbs, cons) <- (evalStateT $ getTyVarCons classname typename) []
                             -- Need to remove phantom types, needs GHC 7.2
@@ -325,13 +325,11 @@ generateClassContext classname typename = do
                             types <- fmap (nub. concat) $ mapM (getContextType varName2Role) cons
                             let len = length $ types ++ tfs
                             if len == 0
-                              then return Nothing
+                              then return []
                               else do
                                   -- Eq a, Eq b ...
                                   let contexts = map (AppT (ConT classname)) (types ++ tfs ++ reTyVars)
-                                  -- (Eq a, Eq b ...)
-                                  let contextTuple = foldl1 AppT $ (TupleT len) : contexts
-                                  return $ Just contextTuple
+                                  return $ contexts
 
 
 #if __GLASGOW_HASKELL__ > 810
@@ -344,6 +342,22 @@ getTVBName (PlainTV name)   = name
 getTVBName (KindedTV name _) = name
 #endif
 
+type Var = String
+
+data ExpX a = LitX (XLit a)  Integer
+            | VarX (XVar a)  Var
+            | AnnX (XAnn a)  (ExpX a) Typ
+            | AbsX (XAbs a)  Var (ExpX a)
+            | AppX (XApp a)  (ExpX a) (ExpX a)
+
+data Typ = Int | Fun Typ Typ
+
+type family XLit a
+type family XVar a
+type family XAnn a
+type family XAbs a
+type family XApp a
+
 
 getTypeNames :: Type -> [Name]
 getTypeNames (ForallT tvbs cxt t) = getTypeNames t
@@ -353,7 +367,7 @@ getTypeNames _ = []
 
 expandSynsAndGetTypeNames :: [Type] -> Q [TypeName]
 expandSynsAndGetTypeNames ts = do
-                          ts' <- mapM expandSyns ts
+                          ts' <- mapM noWarnexpandSynsWith ts
                           return $ concatMap getTypeNames ts'
 
 getCompositeTypeNames :: Con -> Q [TypeName]
