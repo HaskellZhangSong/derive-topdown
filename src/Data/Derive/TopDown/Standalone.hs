@@ -3,6 +3,7 @@ module Data.Derive.TopDown.Standalone (
   deriving_, derivings, derivingss, deriving_with_breaks
 #if __GLASGOW_HASKELL__ >= 802
   ,strategy_deriving
+  ,strategy_deriving_with_breaks
   ,strategy_derivings
   ,strategy_derivingss
 #endif
@@ -120,6 +121,14 @@ strategy_deriving :: DerivStrategy
                   -> Q [Dec]
 
 strategy_deriving st cn tn = evalStateT (genStandaloneDerivingDecl cn tn (Just st) []) []
+
+strategy_deriving_with_breaks :: DerivStrategy
+                  -> Name
+                  -> Name
+                  -> [Name] -- ^ type names that stop the deriving process
+                  -> Q [Dec]
+
+strategy_deriving_with_breaks st cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn (Just st) bs) []
 
 strategy_derivings :: DerivStrategy
                    -> [Name]

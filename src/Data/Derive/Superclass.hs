@@ -131,7 +131,6 @@ deriving_superclasses' cn tn = do
                     classContext <- if isCnHighOrderClass
                                         then lift $ generateClassContext cn tn
                                         else return []
-                    --
                     let typeNames = map getTVBName tvbs
                     isIns <- lift $ isInstance' cn [ConT tn]
                     if (isIns || elem tp types)
