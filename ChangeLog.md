@@ -10,12 +10,11 @@ derive-topdown-0.0.2.1
 - `0.0.2.1`
 	* Remove unnecessary dependencies for testing.
 
-
 derive-topdown-0.0.2.0
 --------------
 - `0.0.2.0`
 	* Add deriving superclass functions. When you want to derive a class instance, not necessary to derive all its superclasses.
-    
+
 derive-topdown-0.0.1.0
 --------------
 - `0.0.1.0`
