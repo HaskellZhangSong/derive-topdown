@@ -3,8 +3,6 @@
 {-# LANGUAGE RankNTypes#-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-{-# LANGUAGE StandaloneDeriving, FlexibleContexts, UndecidableInstances #-}
-
 module Data.Derive.TopDown.Lib (
   isInstance'
  , generateClassContext
@@ -122,11 +120,6 @@ getTypeVarAppTypes t = if isLeftMostAppTypeVar t
 getAllTypeVarAppTypes :: Data a => a -> [Type]
 getAllTypeVarAppTypes = everythingBut (++) (mkQ ([], False) getTypeVarAppTypes)
 
-test :: Name -> Q [Type]
-test t = do
-   a <- reify t
-   return $ getAllTypeVarAppTypes a
-
 -- When a type variable is both representational and nominal,
 -- we still need to put it in the context
 getRepresentionalTypeVar :: Type -> Q ([Type], Bool)
@@ -223,7 +216,6 @@ getContextType name2role (ForallC tvbs _ con) = let scopedVarNames = map (getTVB
                                            let ty_vars = filter (\ty -> (null $ intersect (getAllVarNames ty) scopedVarNames)) types
                                            fmap concat $ mapM (expandSynsAndGetContextTypes name2role) ty_vars
 #else
-
 getContextType name2role (ForallC tvbs _ con) =  let scopedVarNames = map getTVBName tvbs in
                                          do
                                            types <- (getContextType name2role) con
@@ -323,12 +315,13 @@ generateClassContext classname typename = do
                             reTyVars <- getAllRepresentionalTypeVarFromName typename
                             tfs <- getAllTypeFamilyTypesFromName typename
                             types <- fmap (nub. concat) $ mapM (getContextType varName2Role) cons
-                            let len = length $ types ++ tfs
+                            let contextTypes = types ++ tfs ++ reTyVars
+                            let len = length $ contextTypes
                             if len == 0
                               then return []
                               else do
                                   -- Eq a, Eq b ...
-                                  let contexts = map (AppT (ConT classname)) (types ++ tfs ++ reTyVars)
+                                  let contexts = map (AppT (ConT classname)) contextTypes
                                   return $ contexts
 
 
