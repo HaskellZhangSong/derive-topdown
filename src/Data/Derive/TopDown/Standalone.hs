@@ -4,7 +4,7 @@ module Data.Derive.TopDown.Standalone (
   , derivings
   , derivingss
   , deriving_with_breaks
-  , _deriving_
+  , _deriving
   , _derivings
   , _derivingss
   , _deriving_with_breaks
@@ -31,6 +31,7 @@ import Data.List (foldl')
 import Data.Primitive.Types
 import Data.Typeable
 
+{- | In GHC 8.6 @PartialTypeSignatures@ can be used to enable wildcard as the class instance context -}
 data TypeContext = Generated | Wildcard
 
 #if __GLASGOW_HASKELL__ >= 802
@@ -159,42 +160,32 @@ strategy_derivingss st cns tns = fmap concat $ (mapM (\x -> strategy_derivings s
 #endif
 
 
-{- | A standalone deriving clause with class context of the instance a wildcard. Need to be used with @PartialTypeSignatures@ language extension -}
-_deriving_ :: Name -- ^ class name
+#if __GLASGOW_HASKELL__ >= 806
+_deriving :: Name -- ^ class name
           -> Name -- ^ type name
           -> Q [Dec]
 
-#if __GLASGOW_HASKELL__ >= 802
-_deriving_ cn tn = evalStateT (genStandaloneDerivingDecl cn tn Nothing Wildcard []) []
-#else
-_deriving_ cn tn = evalStateT (genStandaloneDerivingDecl cn tn Wildcard []) []
-#endif
 
-
+_deriving cn tn = evalStateT (genStandaloneDerivingDecl cn tn Nothing Wildcard []) []
 
 _deriving_with_breaks :: Name -- ^ class name
            -> Name -- ^ type name
            -> [Name] -- ^ type names that stop the deriving process
            -> Q [Dec]
 
-#if __GLASGOW_HASKELL__ >= 802
 _deriving_with_breaks cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn Nothing Wildcard bs) []
-#else
-_deriving_with_breaks cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn Wildcard bs) []
-#endif
+
 
 _derivings :: [Name] -- ^ class names
           -> Name   -- ^ type name
           -> Q [Dec]
-_derivings cns tn = fmap concat (mapM (\x -> _deriving_ x tn) cns)
+_derivings cns tn = fmap concat (mapM (\x -> _deriving x tn) cns)
 
 _derivingss :: [Name] -- ^ class names
            -> [Name] -- ^ type names
            -> Q [Dec]
 _derivingss cns tns = fmap concat (mapM (\x -> _derivings cns x) tns)
 
-
-#if __GLASGOW_HASKELL__ >= 802
 _strategy_deriving :: DerivStrategy
                   -> Name
                   -> Name
