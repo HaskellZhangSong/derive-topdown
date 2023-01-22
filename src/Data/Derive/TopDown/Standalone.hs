@@ -1,11 +1,22 @@
 {-# LANGUAGE TemplateHaskell  #-}
 module Data.Derive.TopDown.Standalone (
-  deriving_, derivings, derivingss, deriving_with_breaks
+    deriving_
+  , derivings
+  , derivingss
+  , deriving_with_breaks
+  , _deriving_
+  , _derivings
+  , _derivingss
+  , _deriving_with_breaks
 #if __GLASGOW_HASKELL__ >= 802
-  ,strategy_deriving
-  ,strategy_deriving_with_breaks
-  ,strategy_derivings
-  ,strategy_derivingss
+  , strategy_deriving
+  , strategy_deriving_with_breaks
+  , strategy_derivings
+  , strategy_derivingss
+  , _strategy_deriving
+  , _strategy_deriving_with_breaks
+  , _strategy_derivings
+  , _strategy_derivingss
 #endif
   ) where
 
@@ -20,15 +31,19 @@ import Data.List (foldl')
 import Data.Primitive.Types
 import Data.Typeable
 
+data TypeContext = Generated | Wildcard
+
 #if __GLASGOW_HASKELL__ >= 802
-genStandaloneDerivingDecl :: ClassName -> TypeName -> Maybe DerivStrategy -> [TypeName] -> StateT [Type] Q [Dec]
-genStandaloneDerivingDecl cn tn st breaks = do
+genStandaloneDerivingDecl :: ClassName -> TypeName -> Maybe DerivStrategy -> TypeContext -> [TypeName] -> StateT [Type] Q [Dec]
+genStandaloneDerivingDecl cn tn st tcxt breaks = do
 #else
-genStandaloneDerivingDecl :: ClassName -> TypeName -> [TypeName] -> StateT [Type] Q [Dec]
-genStandaloneDerivingDecl cn tn breaks = do
+genStandaloneDerivingDecl :: ClassName -> TypeName -> TypeContext -> [TypeName] -> StateT [Type] Q [Dec]
+genStandaloneDerivingDecl cn tn tcxt breaks = do
 #endif
                    (tvbs,cons) <- getTyVarCons cn tn
-                   classContext <- lift $ generateClassContext cn tn
+                   classContext <- case tcxt of 
+                                     Generated -> lift $ generateClassContext cn tn
+                                     Wildcard -> return [WildCardT]
                    let typeNames = map getTVBName tvbs
                    instanceType <- lift $ foldl' appT (conT tn) $ map varT typeNames
                     -- Stop generating further instances
@@ -57,16 +72,16 @@ genStandaloneDerivingDecl cn tn breaks = do
                                                _                    -> standaloneD st
                                          _       -> standaloneD st
 #else
-                       let c = [StandaloneDerivD context (AppT (ConT cn) instanceType)]
+                       let c = [StandaloneDerivD classContext (AppT (ConT cn) instanceType)]
 #endif
                        modify (instanceType:)
                        names <- lift $ fmap concat $ mapM getCompositeTypeNames cons
 
                        names' <- lift $ filterM (\x -> fmap not (isTypeFamily x)) names
 #if __GLASGOW_HASKELL__ >= 802
-                       xs <- mapM (\n -> genStandaloneDerivingDecl cn n st breaks) names'
+                       xs <- mapM (\n -> genStandaloneDerivingDecl cn n st tcxt breaks) names'
 #else
-                       xs <- mapM (\n -> genStandaloneDerivingDecl cn n breaks) names'
+                       xs <- mapM (\n -> genStandaloneDerivingDecl cn n tcxt breaks) names'
 #endif
                        return $ concat xs ++ c
 
@@ -76,9 +91,9 @@ deriving_ :: Name -- ^ class name
           -> Q [Dec]
 
 #if __GLASGOW_HASKELL__ >= 802
-deriving_ cn tn = evalStateT (genStandaloneDerivingDecl cn tn Nothing []) []
+deriving_ cn tn = evalStateT (genStandaloneDerivingDecl cn tn Nothing Generated []) []
 #else
-deriving_ cn tn = evalStateT (genStandaloneDerivingDecl cn tn []) []
+deriving_ cn tn = evalStateT (genStandaloneDerivingDecl cn tn Generated []) []
 #endif
 
 {- | This is particularly useful with 'Generic' class.
@@ -97,11 +112,10 @@ deriving_with_breaks :: Name -- ^ class name
           -> Q [Dec]
 
 #if __GLASGOW_HASKELL__ >= 802
-deriving_with_breaks cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn Nothing bs) []
+deriving_with_breaks cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn Nothing Generated bs) []
 #else
-deriving_with_breaks cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn bs) []
+deriving_with_breaks cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn Generated bs) []
 #endif
-
 
 derivings :: [Name] -- ^ class names
           -> Name   -- ^ type name
@@ -120,7 +134,7 @@ strategy_deriving :: DerivStrategy
                   -> Name
                   -> Q [Dec]
 
-strategy_deriving st cn tn = evalStateT (genStandaloneDerivingDecl cn tn (Just st) []) []
+strategy_deriving st cn tn = evalStateT (genStandaloneDerivingDecl cn tn (Just st) Generated []) []
 
 strategy_deriving_with_breaks :: DerivStrategy
                   -> Name
@@ -128,7 +142,7 @@ strategy_deriving_with_breaks :: DerivStrategy
                   -> [Name] -- ^ type names that stop the deriving process
                   -> Q [Dec]
 
-strategy_deriving_with_breaks st cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn (Just st) bs) []
+strategy_deriving_with_breaks st cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn (Just st) Generated bs) []
 
 strategy_derivings :: DerivStrategy
                    -> [Name]
@@ -142,4 +156,70 @@ strategy_derivingss :: DerivStrategy
                     -> [Name]
                     -> Q [Dec]
 strategy_derivingss st cns tns = fmap concat $ (mapM (\x -> strategy_derivings st cns x) tns)
+#endif
+
+
+{- | A standalone deriving clause with class context of the instance a wildcard. Need to be used with @PartialTypeSignatures@ language extension -}
+_deriving_ :: Name -- ^ class name
+          -> Name -- ^ type name
+          -> Q [Dec]
+
+#if __GLASGOW_HASKELL__ >= 802
+_deriving_ cn tn = evalStateT (genStandaloneDerivingDecl cn tn Nothing Wildcard []) []
+#else
+_deriving_ cn tn = evalStateT (genStandaloneDerivingDecl cn tn Wildcard []) []
+#endif
+
+
+
+_deriving_with_breaks :: Name -- ^ class name
+           -> Name -- ^ type name
+           -> [Name] -- ^ type names that stop the deriving process
+           -> Q [Dec]
+
+#if __GLASGOW_HASKELL__ >= 802
+_deriving_with_breaks cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn Nothing Wildcard bs) []
+#else
+_deriving_with_breaks cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn Wildcard bs) []
+#endif
+
+_derivings :: [Name] -- ^ class names
+          -> Name   -- ^ type name
+          -> Q [Dec]
+_derivings cns tn = fmap concat (mapM (\x -> _deriving_ x tn) cns)
+
+_derivingss :: [Name] -- ^ class names
+           -> [Name] -- ^ type names
+           -> Q [Dec]
+_derivingss cns tns = fmap concat (mapM (\x -> _derivings cns x) tns)
+
+
+#if __GLASGOW_HASKELL__ >= 802
+_strategy_deriving :: DerivStrategy
+                  -> Name
+                  -> Name
+                  -> Q [Dec]
+
+_strategy_deriving st cn tn = evalStateT (genStandaloneDerivingDecl cn tn (Just st) Wildcard []) []
+
+_strategy_deriving_with_breaks :: DerivStrategy
+                  -> Name
+                  -> Name
+                  -> [Name] -- ^ type names that stop the deriving process
+                  -> Q [Dec]
+
+_strategy_deriving_with_breaks st cn tn bs = evalStateT (genStandaloneDerivingDecl cn tn (Just st) Wildcard bs) []
+
+_strategy_derivings :: DerivStrategy
+                   -> [Name]
+                   -> Name
+                   -> Q [Dec]
+
+_strategy_derivings st cns tn = fmap concat $ (mapM (\x -> strategy_deriving st x tn) cns)
+
+_strategy_derivingss :: DerivStrategy
+                    -> [Name]
+                    -> [Name]
+                    -> Q [Dec]
+_strategy_derivingss st cns tns = fmap concat $ (mapM (\x -> strategy_derivings st cns x) tns)
 #endif
