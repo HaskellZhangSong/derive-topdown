@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE CPP, TypeFamilies,GADTs #-}
 {-# LANGUAGE RankNTypes#-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -28,11 +28,10 @@ import Control.Monad.State
 import Control.Monad.Trans
 import Control.Applicative
 import Control.Monad
-#ifdef __GLASGOW_HASKELL__
 import Data.List
 import Data.Typeable
 import Data.Data
-#endif
+import Debug.Trace
 
 noWarnexpandSynsWith :: Type -> Q Type
 noWarnexpandSynsWith = expandSynsWith noWarnTypeFamilies
@@ -204,35 +203,59 @@ constructorTypesVars n2r  (ConstraintT) = []
 constructorTypesVars n2r  (ArrowT) = []
 constructorTypesVars n2r  t = error $ pprint t ++ " is not support"
 
-expandSynsAndGetContextTypes :: [(Name, Role)] -> Type -> Q [Type]
-expandSynsAndGetContextTypes n2r t = do
+expandSynsAndGetContextTypes :: [(TypeVarBind, Role)] -> Type -> Q [Type]
+expandSynsAndGetContextTypes tvb2rs t = do
                              t' <- noWarnexpandSynsWith t
+                             let n2r = map (\(tvb, r) -> (getTVBName tvb, r)) tvb2rs
                              return $ (constructorTypesVars n2r  t')
 
 third (a,b,c) = c
 
-getContextType :: [(Name, Role)] -> Con -> Q [Type]
-getContextType name2role (NormalC name bangtypes) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map snd bangtypes)
-getContextType name2role (RecC name varbangtypes) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map third varbangtypes)
-getContextType name2role (InfixC bangtype1 name bangtype2) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map snd [bangtype1, bangtype2])
+getContextType :: [(TypeVarBind, Role)] -> Con -> Q [Type]
+getContextType tvb2role (NormalC name bangtypes) = fmap concat $ mapM (expandSynsAndGetContextTypes tvb2role) (map snd bangtypes)
+getContextType tvb2role (RecC name varbangtypes) = fmap concat $ mapM (expandSynsAndGetContextTypes tvb2role) (map third varbangtypes)
+getContextType tvb2role (InfixC bangtype1 name bangtype2) = fmap concat $ mapM (expandSynsAndGetContextTypes tvb2role) (map snd [bangtype1, bangtype2])
 -- need to remove types which contains scoped variables
 #if __GLASGOW_HASKELL__ > 810
-getContextType name2role (ForallC tvbs _ con) = let scopedVarNames = map (getTVBName.voidTyVarBndrFlag) tvbs in
+
+{-
+There are 2 foralls for GADTs
+
+data T4 k a b where
+  T31 :: a -> k b -> T4 k a b
+
+> putStrLn  $(reify ''T4  >>=  (\x -> return $ ppr x) >>= stringE . show)           
+data Lib.T4 (k_0 :: * -> *) (a_1 :: *) (b_2 :: *) where
+   T31 :: forall (a_1 :: *) (k_0 :: * -> *) (b_2 :: *) . a_1 -> (k_0 b_2) -> T4 k_0 a_1 b_2
+
+data T1 k a b = T11 (k a) b | T12 (k (k a)) a b String
+
+While for GFT1 the qualified 'a' should not be in the context of class instance
+
+data GadtForall where
+    GFT1 :: Show a => a -> GadtForall
+
+That is why the intersect of type parameters in type constructor and type variables in data constructor needs to be null
+-}
+
+getContextType tvb2role (ForallC tvbs _ con) = let scopedVarNames = map (getTVBName.voidTyVarBndrFlag) tvbs in
                                          do
-                                           types <- (getContextType name2role) con
+                                           types <- (getContextType tvb2role) con
                                            let ty_vars = filter (\ty -> (null $ intersect (getAllVarNames ty) scopedVarNames)) types
-                                           fmap concat $ mapM (expandSynsAndGetContextTypes name2role) ty_vars
+                                           fmap concat $ mapM (expandSynsAndGetContextTypes tvb2role) 
+                                              (if (sort $ map (voidTyVarBndrFlag.fst) tvb2role) == sort (map voidTyVarBndrFlag tvbs) 
+                                                then types else ty_vars) 
 #else
 
-getContextType name2role (ForallC tvbs _ con) =  let scopedVarNames = map getTVBName tvbs in
+getContextType tvb2role (ForallC tvbs _ con) = let scopedVarNames = map getTVBName tvbs in
                                          do
-                                           types <- (getContextType name2role) con
+                                           types <- (getContextType tvb2role) con
                                            let ty_vars = filter (\ty -> (null $ intersect (getAllVarNames ty) scopedVarNames)) types
-                                           fmap concat $ mapM (expandSynsAndGetContextTypes name2role) ty_vars
+                                           fmap concat $ mapM (expandSynsAndGetContextTypes tvb2role) ty_vars
 #endif
 #if __GLASGOW_HASKELL__ > 710
-getContextType name2role (GadtC name bangtypes result_type) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map snd bangtypes)
-getContextType name2role (RecGadtC name bangtypes result_type) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map third bangtypes)
+getContextType tvb2role (GadtC name bangtypes result_type) = fmap concat $ mapM (expandSynsAndGetContextTypes tvb2role) (map snd bangtypes)
+getContextType tvb2role (RecGadtC name bangtypes result_type) = fmap concat $ mapM (expandSynsAndGetContextTypes tvb2role) (map third bangtypes)
 #endif
 
 getTyVarCons :: ClassName -> TypeName -> StateT [Type] Q ([TypeVarBind], [Con])
@@ -314,21 +337,26 @@ voidTyVarBndrFlag (KindedTV n f k) = KindedTV n () k
 
 -- In the future of GHC, this will be removed.
 -- See https://ghc.haskell.org/trac/ghc/ticket/13324
+-- This function is not correct need to be rewrite in a more formalized way
 generateClassContext :: ClassName -> TypeName -> Q Cxt
 generateClassContext classname typename = do
                             (tvbs, cons) <- (evalStateT $ getTyVarCons classname typename) []
                             -- Need to remove phantom types, needs GHC 7.2
                             roles <- getTypeNameRoles typename
-                            let varName2Role = zip (map getTVBName tvbs) roles
-                            reTyVars <- getAllRepresentionalTypeVarFromName typename
+                            let typeVarBind2Role = zip tvbs roles
+                            traceShowM "typeVarBind2Role"
+                            traceShowM typeVarBind2Role
+                            let reTyVars = map (tvb2type . fst) (filter (\(t,r) -> r /= PhantomR && getTVBKind t == StarT) typeVarBind2Role)
+                            traceShowM "reTyVars"
+                            traceShowM reTyVars
                             tfs <- getAllTypeFamilyTypesFromName typename
-                            types <- fmap (nub. concat) $ mapM (getContextType varName2Role) cons
+                            types <- fmap (nub. concat) $ mapM (getContextType typeVarBind2Role) cons
                             let len = length $ types ++ tfs
                             if len == 0
                               then return []
                               else do
                                   -- Eq a, Eq b ...
-                                  let contexts = map (AppT (ConT classname)) (types ++ tfs ++ reTyVars)
+                                  let contexts = map (AppT (ConT classname)) (nub (types ++ tfs ++ reTyVars))
                                   return $ contexts
 
 
@@ -342,21 +370,25 @@ getTVBName (PlainTV name)   = name
 getTVBName (KindedTV name _) = name
 #endif
 
-type Var = String
+#if __GLASGOW_HASKELL__ > 810
+getTVBKind :: TyVarBndr () -> Kind
+getTVBKind (PlainTV name f) = StarT -- This is not correct!
+getTVBKind (KindedTV name _ k) = k
+#else
+getTVBKind :: TyVarBndr -> Name
+getTVBKind (PlainTV f) = k
+getTVBKind (KindedTV name _) = k
+#endif
 
-data ExpX a = LitX (XLit a)  Integer
-            | VarX (XVar a)  Var
-            | AnnX (XAnn a)  (ExpX a) Typ
-            | AbsX (XAbs a)  Var (ExpX a)
-            | AppX (XApp a)  (ExpX a) (ExpX a)
-
-data Typ = Int | Fun Typ Typ
-
-type family XLit a
-type family XVar a
-type family XAnn a
-type family XAbs a
-type family XApp a
+#if __GLASGOW_HASKELL__ > 810
+tvb2type :: TyVarBndr () -> Kind
+tvb2type (PlainTV name f) = VarT name
+tvb2type (KindedTV name _ k) = VarT name
+#else
+tvb2type :: TyVarBndr -> Name
+tvb2type (PlainTV f) = VarT name
+tvb2type (KindedTV name _) = VarT name
+#endif
 
 
 getTypeNames :: Type -> [Name]

@@ -85,7 +85,8 @@ Also, there are some data types which are impossible to be derived as instances 
 * __NOTE!__ When derive @Generic@ type class, @derive-topdown@ will stop generation on primitive and 'Integer' types. You need to specify the types that deriving @Generic@ class can break with. See the document below.
 
 -}
-
+{-# LANGUAGE GADTs, TemplateHaskell,StandaloneDeriving,UndecidableInstances #-}
+{-# OPTIONS_GHC -ddump-splices #-}
 module Data.Derive.TopDown (
   module Data.Derive.TopDown.Standalone,
   module Data.Derive.TopDown.Instance,
@@ -112,3 +113,15 @@ stock     = StockStrategy
 anyclass  = AnyclassStrategy
 newtype_  = NewtypeStrategy
 #endif
+
+-- data T1 k a b = T11 (k a) b | T12 (k (k a)) a b String
+-- deriving_ ''Show ''T1 
+
+data T4 k a b where
+  T31 :: a -> k b -> T4 k a b
+
+-- deriving instance (Show a_0,
+--                    Show (k_1 b_2),
+--                    Show b_2) => Show (T4 k_1  a_0 b_2)
+
+-- deriving_ ''Show ''T4
