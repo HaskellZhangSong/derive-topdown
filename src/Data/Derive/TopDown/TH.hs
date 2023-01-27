@@ -17,7 +17,7 @@ import Data.List (foldl')
 
 genTH :: (ClassName, Name -> Q [Dec]) -> TypeName -> [TypeName] -> StateT [Type] Q [Dec]
 genTH (className,deriveFunction) typeName breaks = do
-                       (tvbs, cons) <- getTyVarCons className typeName
+                       (tvbs, cons) <- lift $ getTyVarCons typeName
                        compositeNames <- lift $ fmap concat $ mapM getCompositeTypeNames cons
                        let typeNames = map getTVBName tvbs
                        instanceType <- lift $ foldl' appT (conT typeName) $ map varT typeNames

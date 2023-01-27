@@ -40,7 +40,7 @@ genStandaloneDerivingDecl cn tn st tcxt breaks = do
 genStandaloneDerivingDecl :: ClassName -> TypeName -> TypeContext -> [TypeName] -> StateT [Type] Q [Dec]
 genStandaloneDerivingDecl cn tn tcxt breaks = do
 #endif
-                   (tvbs,cons) <- getTyVarCons cn tn
+                   (tvbs,cons) <- lift $ getTyVarCons tn
                    classContext <- case tcxt of 
                                      Generated -> lift $ generateClassContext cn tn
                                      Wildcard -> return [WildCardT]

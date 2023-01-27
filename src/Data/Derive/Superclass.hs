@@ -124,7 +124,7 @@ deriving_superclasses' st cn tn = do
 deriving_superclasses' :: Name -> Name -> StateT [Type] Q [Dec]
 deriving_superclasses' cn tn = do
 #endif
-                    (tvbs,cons) <- getTyVarCons cn tn
+                    (tvbs,cons) <- lift $ getTyVarCons tn
                     let tp = AppT (ConT cn) (ConT tn) 
                     types <- get
                     isCnHighOrderClass <- lift $ isHigherOrderClass cn

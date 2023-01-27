@@ -16,6 +16,8 @@ module Data.Derive.TopDown.Lib (
  , DecTyType(..)
  , getTypeConstructor
  , isTypeFamily
+ , TypeVarBind
+ , getTypeNameRoles
  ) where
 
 import Language.Haskell.TH
@@ -28,6 +30,7 @@ import Control.Monad.State
 import Control.Monad.Trans
 import Control.Applicative
 import Control.Monad
+import Data.Derive.TopDown.SYB
 #ifdef __GLASGOW_HASKELL__
 import Data.List
 import Data.Typeable
@@ -84,20 +87,6 @@ getTypeFamilyType ty = do
                   if isTF 
                     then return ([ty], True)
                     else return ([], False)
-
-everythingMBut :: forall r m. Monad m => (m r -> m r -> m r)
-                          -> (forall a. Data a => a -> m (r, Bool)) 
-                          -> (forall a. Data a => a -> m r)
-everythingMBut k f = go
-      where
-            go :: forall a. Data a => a -> m r
-            go x = do 
-                (res, stop) <- f x
-                if stop 
-                    then return res
-                    else do 
-                      let ls = gmapQ go x :: [m r]
-                      foldl' k (return res) ls
 
 getAllTypeFamilyTypes :: Data a => a -> Q [Type]
 getAllTypeFamilyTypes = everythingMBut (liftA2 (++)) (mkQ (return ([], False)) getTypeFamilyType)
@@ -235,9 +224,9 @@ getContextType name2role (GadtC name bangtypes result_type) = fmap concat $ mapM
 getContextType name2role (RecGadtC name bangtypes result_type) = fmap concat $ mapM (expandSynsAndGetContextTypes name2role) (map third bangtypes)
 #endif
 
-getTyVarCons :: ClassName -> TypeName -> StateT [Type] Q ([TypeVarBind], [Con])
-getTyVarCons cn name = do
-            info <- lift $ reify name
+getTyVarCons :: TypeName -> Q ([TypeVarBind], [Con])
+getTyVarCons name = do
+            info <- reify name
             case info of
               TyConI dec -> case dec of
 #if __GLASGOW_HASKELL__ > 810
@@ -255,9 +244,8 @@ getTyVarCons cn name = do
                               TySynD name tvbs t -> error $ show name ++ " is a type synonym and `TypeSynonymInstances' is not supported. "
                                   ++ "If you did not derive it then this is a bug, please report this bug to the author of `derive-topdown' package."
                               x -> do
-                                 tys <- get
-                                 error $ pprint x ++ " is not a data or newtype definition. " ++ show "Stack: " ++ show tys
-              _ -> error $ "Cannot generate "++ show cn ++ " instances for " ++ show name
+                                 error $ pprint (x :: Dec) ++ " is not a data or newtype definition."
+              _ -> error $ "Cannot generate instances for " ++ show name
 
 type ClassName = Name
 type TypeName = Name
@@ -293,7 +281,7 @@ getTypeNameRoles tn = do
               -- I write this due to a possible bug of GHC.
               -- With PolyKinds extension, GHC may return more 
               -- roles than expected with reifyRoles function.
-              -- See: https://gitlab.haskell.org/ghc/ghc/-/issues/21046
+              -- See: https://gitlab.haskell.org/ghc/ghc/-/issues/21056
               if length vars < length roles
                 then return (drop (length polyKindedBndVar) roles)
                 else return roles
@@ -316,7 +304,7 @@ voidTyVarBndrFlag (KindedTV n f k) = KindedTV n () k
 -- See https://ghc.haskell.org/trac/ghc/ticket/13324
 generateClassContext :: ClassName -> TypeName -> Q Cxt
 generateClassContext classname typename = do
-                            (tvbs, cons) <- (evalStateT $ getTyVarCons classname typename) []
+                            (tvbs, cons) <- (getTyVarCons typename)
                             -- Need to remove phantom types, needs GHC 7.2
                             roles <- getTypeNameRoles typename
                             let varName2Role = zip (map getTVBName tvbs) roles
