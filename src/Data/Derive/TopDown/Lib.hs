@@ -73,7 +73,7 @@ getVarName :: Type -> [Name]
 getVarName (VarT n) = [n]
 getVarName _ = []
 
-getAllVarNames :: Type -> [Name]
+getAllVarNames :: Data a => a -> [Name]
 getAllVarNames = everything (++) (mkQ [] getVarName)
 
 isLeftMostAppTTypeFamily :: Type -> Q Bool

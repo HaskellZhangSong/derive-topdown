@@ -1,9 +1,10 @@
-{-# LANGUAGE GADTs, ViewPatterns, MultiWayIf, BlockArguments, RankNTypes, ScopedTypeVariables, KindSignatures, TypeFamilies #-}
+{-# LANGUAGE CPP, GADTs, ViewPatterns, MultiWayIf, BlockArguments, RankNTypes, ScopedTypeVariables, KindSignatures, TypeFamilies, DeriveLift, BangPatterns #-}
 
 module Data.Derive.TopDown.CxtGen where
 
 import Control.Monad
 import Data.Data
+import Data.Function
 import Data.Generics
 import Data.List
 import Data.Derive.TopDown.Lib
@@ -46,8 +47,16 @@ getVarName :: Type -> [Name]
 getVarName (VarT n) = [n]
 getVarName _ = []
 
-getAllVarNames :: Type -> [Name]
+getAllVarNames :: Data a => a -> [Name]
 getAllVarNames = everything (++) (mkQ [] getVarName)
+
+replaceName :: [(Name, Name)] -> Name -> Name
+replaceName m nm = case lookup nm m of
+                    Nothing -> nm
+                    Just n -> n
+
+replaceAllNames :: Data a => [(Name, Name)] -> a -> a
+replaceAllNames m = everywhere (mkT (replaceName m))
 
 third :: (a, b, c) -> c
 third (a, b, c) = c
@@ -68,8 +77,8 @@ voidTyVarBndrFlag (KindedTV n f k) = KindedTV n () k
 getConArgs :: Bool -> Con -> [Type]
 getConArgs gadt (GadtC nm bt t)    = map snd bt
 getConArgs gadt (RecGadtC nm bt t) = map third bt
-getConArgs gadt (NormalC nm bt)    = concatMap (getConstrFields.snd) bt
-getConArgs gadt (RecC nm vbts)     = concatMap (getConstrFields.third) vbts
+getConArgs gadt (NormalC nm bt)    = map snd bt
+getConArgs gadt (RecC nm vbts)     = map third vbts
 getConArgs gadt (InfixC bt nm bt2) = [snd bt, snd bt2]
 -- need GHC version Macro > 810
 -- must not GADT
@@ -113,23 +122,53 @@ In most cases, the roles are representation.
 data ICTRole = P | N | R
     deriving (Show, Eq, Ord, Enum)
 
+roleListToExp :: Name -> Q Exp
+roleListToExp nm = do
+                roles <- inferICTRoles nm
+                listE $ map (\r -> conE $ mkName $ show r) roles
+                
+
 ictRoleToRole P = PhantomR
 ictRoleToRole N = NominalR
 ictRoleToRole R = RepresentationalR
 
-roleToIctRole PhantomR = P 
+roleToIctRole PhantomR = P
 roleToIctRole NominalR = N
 roleToIctRole RepresentationalR = R
 
 (.*) :: ICTRole -> ICTRole -> ICTRole
 (.*) = max
 
-
-
 -- get the left most type in AppT
 getTypeConstr :: Type -> Type
 getTypeConstr t = head $ unappTy t
 
+getRoleFromFields :: TypeName  -- ^ type variable name
+                  -> [Type]
+                  -> [ICTRole]
+                  -> Q ICTRole
+getRoleFromFields tn tys roles = let fieldToRoles = zip tys roles in
+                      case lookup (VarT tn) fieldToRoles of
+                          -- if tn is in the fields directly, then the role will be the ICT role
+                          Just r -> return r
+                          -- For each of the type in the data constr field, we 
+                          -- infer role and getRole recursively
+                          Nothing -> do
+                                  roles <- forM fieldToRoles $ \(f::Type, r) -> do
+                                    -- check whether tn is in f
+                                    case r of 
+                                      P -> return P
+                                      -- tn = a, XLit (Maybe a)
+                                      N -> if tn `elem` getAllVarNames f 
+                                              then return N
+                                              else return P
+                                      -- Maybe (Either [a] Int) -- need recursive call
+                                      -- Maybe (Either (Proxy a) Int) -- need recursive call
+                                      -- Maybe (Either (Xlit) a) Int) -- need recursive call
+                                      R -> do
+                                        role <- getRole tn f
+                                        return $ min R role
+                                  return $ maximum roles
 
 getRole :: TypeName  -- ^ type variable name
         -> Type      -- ^ field type
@@ -141,7 +180,8 @@ getRole :: TypeName  -- ^ type variable name
 getRole tn (VarT nm) = if tn == nm
                         then return R
                         else return P
--- data I a = I Int. 'a' is not used
+                          
+-- data I a = I Int. 'a' is not used since the field is a named constructor
 getRole tn (ConT nm) = return P
 -- The type variable is used as arguments of type constr such as 
 -- 1. 'data I a = I (Either (Maybe a) Int)' -- hard
@@ -154,46 +194,19 @@ getRole tn (ConT nm) = return P
 getRole tn t2@(getTypeConstr -> ConT cn) = do
                       ictRoles <- inferICTRoles cn
                       let fields = getConstrFields t2
-                      let fieldToRoles = zip fields ictRoles
-                      case lookup (VarT tn) fieldToRoles of
-                          -- if tn is in the fields directly, then the role will be the ICT role
-                          Just r -> return r
-                          -- For each of the type in the data constr field, we 
-                          -- infer role and getRole recursively
-                          Nothing -> let vars = getAllVarNames t2 in 
-                                        if tn `notElem` vars 
-                                          -- If the variable is not occur in the field
-                                          -- then it's phantom. This is only a quick return.
-                                          then return P
-                                          -- If it do occur in the field, we need to get
-                                          -- its role if it's in nominal position then nominal like case 2.
-                                          -- if it's in rep position then it's rep like case 1
-                                          -- This should be a recursive call.
-                                          else do
-                                            roles <- forM fieldToRoles $ \(f::Type, r) -> do
-                                              -- check whether tn is in f
-                                              case r of 
-                                                P -> return P
-                                                -- tn = a, XLit (Maybe a)
-                                                N -> if tn `elem` getAllVarNames f 
-                                                        then return N
-                                                        else return P
-                                                -- Maybe (Either [a] Int) -- need recursive call
-                                                -- Maybe (Either (Proxy a) Int) -- need recursive call
-                                                -- Maybe (Either (Xlit) a) Int) -- need recursive call
-                                                R -> do
-                                                  role <- getRole tn f
-                                                  return $ min R role
-                                            return $ maximum roles
+                      getRoleFromFields tn fields ictRoles
                                             
 
 -- 'data I a = I (k (Maybe a)) Int'
 getRole tn t2@(getTypeConstr -> VarT nm) = return N
 -- data I a = I [a]
 getRole tn t2@(getTypeConstr -> ListT) = let vars = getAllVarNames t2 in 
-                                    if tn `elem` vars 
-                                        then return N
-                                        else return P
+                                    if tn `notElem` vars 
+                                        then return P
+                                        else do 
+                                          let fields = getConstrFields t2
+                                          let ictRoles = [R]
+                                          getRoleFromFields tn fields ictRoles
 -- data A a = A (a :: *)
 getRole tn (getTypeConstr -> AppKindT ty kind)   = getRole tn ty
 getRole tn (getTypeConstr -> SigT ty kind)       = getRole tn ty
@@ -203,48 +216,77 @@ getRole tn (ArrowT) = undefined
 getRole tn (InfixT t1 nm t2) =  do
                       ictRoles <- inferICTRoles nm
                       let fields = [t1, t2]
-                      let fieldToRoles = zip fields ictRoles
-                      case lookup (VarT tn) fieldToRoles of
-                          Just r -> return r
-                          Nothing -> let vars = getAllVarNames t2 in 
-                                        if tn `notElem` vars 
-                                          then return P
-                                          else do
-                                            roles <- forM fieldToRoles $ \(f::Type, r) -> do
-                                              case r of 
-                                                P -> return P
-                                                N -> if tn `elem` (getAllVarNames f) 
-                                                        then return N
-                                                        else return P
-                                                R -> do 
-                                                  role <- getRole tn f
-                                                  return $ min R role
-                                            return $ maximum roles
+                      getRoleFromFields tn fields ictRoles
 
 -- no need to handle this case, 
 getRole tn t@(UInfixT t1 nm t2) = error $ show t ++ " is impossible case for deriving topdown" 
 
 getRole tn (ParensT ty) = getRole tn ty
 -- data I a b = I (a, b)
+-- data I a b = I (Proxy a, b)
 getRole tn t2@(getTypeConstr -> (TupleT n)) = 
                                   let vars = getAllVarNames t2 in 
-                                    if tn `elem` vars 
-                                        then return N
-                                        else return P -- when its App tuple
+                                    if tn `notElem` vars 
+                                        then return P -- quick exit
+                                         else do 
+                                          let fields = getConstrFields t2
+                                          let ictRoles = replicate n R
+                                          getRoleFromFields tn fields ictRoles
 
 -- data I a = I (forall b . b)
 getRole tn t2@(ForallT bnd cxt ty) = getRole tn ty
 getRole tn t2@(ForallVisT bnd ty) = getRole tn ty
-getRole tn f = return P -- not correct. There are a lot other cases
+getRole tn f = return P -- not correct. There are other cases which needs to be handled
+
+
+
+
+type Prefix = String
+
+{-|
+Note: 
+
+If one writes the data constr with different names in type header like the following
+data T4 k a b where
+  T41 :: a -> k b -> T4 k a b -- in template haskell, the type vars will 
+                              -- be quantified twice as 
+                              -- forall a1 k1 b1. a1 -> k1 b1 -> T4 k1 a1 b1
+The process will construct [(k1, k), (b1, b), (a1, a)]
+
+If one writes the data constr like the following:
+
+data T4 k a b where
+  T41 :: c -> f d -> T4 f c d -- or, equivalently,
+                              -- forall c f d. c -> f d -> T4 f c d
+  T42 :: y -> g x -> T4 g y x -- or, equivalently,
+                              -- forall y g x. y -> g x -> T4 g y x
+
+
+This map will be constructed in a wrong way so that generation process may fail.
+See #13885
+-}
+getGadtTyVarNameMap :: [Name] -> [Name] -> [(Name, Name)]
+getGadtTyVarNameMap nm1 nm2 = let pstr1 = nm1 & nub & sort & map (\n -> (show n & reverse & dropWhile (/= '_') & reverse, n)) 
+                                  pstr2 = nm2 & nub & sort & map (\n -> (show n & reverse & dropWhile (/= '_') & reverse, n)) 
+                                in pair pstr1 pstr2
+                              where 
+                                pair :: [(Prefix, Name)] -> [(Prefix, Name)] -> [(Name, Name)]
+                                pair [] strs2 = []
+                                pair ((p, s):xs) str2 = case lookup p str2 of
+                                                          Nothing -> pair xs str2
+                                                          Just a -> (s, a) : pair xs str2
 
 {- | This function returns each ICT role of a type constructor -}
 inferICTRoles :: TypeName -> Q [ICTRole]
 inferICTRoles tn = do 
          isTF <- isTypeFamily tn
          roles <- getTypeNameRoles tn
-         if | isTF -> return $ map roleToIctRole roles
+         if | isTF -> do 
+                    return $ map roleToIctRole roles
            -- Rep and Phantom inference are the same for ICT role inference
-            | all (`elem` [PhantomR, RepresentationalR]) roles -> return $ map roleToIctRole roles
+            | all (`elem` [PhantomR]) roles -> 
+                  do
+                    return $ map roleToIctRole roles
            -- else nominal. we should handle this case, since for type role
            -- a type var in both nominal and representational position will
            -- be inferred as nominal. However, we want it to be representational for 
@@ -252,12 +294,30 @@ inferICTRoles tn = do
             | otherwise ->  do
                   (tvbs, cons) <- getTyVarCons tn
                   let vars = map (getTVBName . voidTyVarBndrFlag) tvbs
-                  traceM $ "vars " ++ show vars 
                   gadt <- isGadt tn
-                  let constrFieldss = if gadt 
-                                        then 
-                                          concatMap (getConArgs True) cons :: [Type]
-                                        else 
+                  let constrFields = if gadt 
+                                        then
+                                          -- GADT will quantify type variable twice. see #13885
+                                          -- one in type constr, one in data constr with different var name
+                                          -- this process will make the variable in data constr
+                                          -- quantified by the vars declared in type constr
+                                          let gadtTyVarNames = map getTVBName tvbs
+                                              gadtConsTyVarNames = getAllVarNames cons
+                                              m = getGadtTyVarNameMap gadtConsTyVarNames gadtTyVarNames
+                                              replaceCons = replaceAllNames m cons
+                                              conArgs = concatMap (getConArgs True) replaceCons
+                                          in
+                                              conArgs
+                                        else
                                           concatMap (getConArgs False) cons :: [Type]
-                  traceM $ "constrFieldss " ++ show constrFieldss                         
-                  sequence [(fmap maximum $ sequence [getRole tn con | con <- constrFieldss]) | tn <- vars]
+                  roles <- sequence [(fmap maximum $ sequence [ do {r <- getRole tn con; 
+                                                                    return r}  | con <- constrFields]) | tn <- vars]
+                  return roles
+
+-- ^ This function will get type class context from a data type
+getContext :: TypeName -> Q [Type]
+getContext tn = 
+
+
+generateClassContext :: ClassName -> TypeName -> Q [Cxt]
+generateClassContext = undefined

@@ -32,7 +32,7 @@ import Data.Primitive.Types
 import Data.Typeable
 
 data TypeContext = Generated | Wildcard
-
+-- Only GHC 8.6.1 support Wildcard type class context
 #if __GLASGOW_HASKELL__ >= 802
 genStandaloneDerivingDecl :: ClassName -> TypeName -> Maybe DerivStrategy -> TypeContext -> [TypeName] -> StateT [Type] Q [Dec]
 genStandaloneDerivingDecl cn tn st tcxt breaks = do

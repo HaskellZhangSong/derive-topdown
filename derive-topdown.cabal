@@ -25,8 +25,11 @@ library
                       Data.Derive.Superclass
   other-modules:      Data.Derive.TopDown.Lib,
                       Data.Derive.TopDown.Standalone,
-                      Data.Derive.TopDown.Instance
-                      Data.Derive.TopDown.TH
+                      Data.Derive.TopDown.Instance,
+                      Data.Derive.TopDown.TH,
+                      Data.Derive.TopDown.CxtGen,
+                      Data.Derive.TopDown.SYB
+
   -- other-extensions:    
   build-depends:       base >=4.8 && <5.0,
                        -- considered 7.10, 8.0, 8.2
@@ -40,7 +43,29 @@ library
                        -- compatible from 7.6 to 8.2
                        mtl>=2.1.0,
                        --
-                       transformers>=0.4.2
+                       transformers>=0.4.2,
+                       deepseq<=1.4.8.1
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  TemplateHaskell,CPP
+
+Test-Suite test-foo
+  type:             exitcode-stdio-1.0
+  build-depends:    base >=4.8 && <5.0,
+                    HUnit < 1.6.2.0,
+                    syb>=0.4,
+                    template-haskell>=2.10,
+                    -- compatible from 7.0 to 7.11
+                    syb>=0.4,
+                    -- compatible from 7.4 to 8.0
+                    primitive>=0.6.2,
+                    -- fully compatible
+                    th-expand-syns>=0.4.3,
+                    -- compatible from 7.6 to 8.2
+                    mtl>=2.1.0,
+                    transformers>=0.4.2
+  hs-source-dirs:   test, src
+  main-is:          Main.hs
+  default-language: Haskell2010
+
+
