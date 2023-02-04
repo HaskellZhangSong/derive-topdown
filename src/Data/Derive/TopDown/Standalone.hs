@@ -21,6 +21,7 @@ module Data.Derive.TopDown.Standalone (
   ) where
 
 import Data.Derive.TopDown.Lib
+import Data.Derive.TopDown.CxtGen
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax hiding (lift)
 import qualified GHC.Generics as G
@@ -42,7 +43,7 @@ genStandaloneDerivingDecl cn tn tcxt breaks = do
 #endif
                    (tvbs,cons) <- lift $ getTyVarCons tn
                    classContext <- case tcxt of 
-                                     Generated -> lift $ generateClassContext cn tn
+                                     Generated -> lift $ generateClassContext1 cn tn
                                      Wildcard -> return [WildCardT]
                    let typeNames = map getTVBName tvbs
                    instanceType <- lift $ foldl' appT (conT tn) $ map varT typeNames

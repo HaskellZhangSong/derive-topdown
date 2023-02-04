@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs, ViewPatterns, MultiWayIf, BlockArguments, RankNTypes, ScopedTypeVariables, KindSignatures, TypeFamilies, DeriveLift, BangPatterns #-}
+{-# LANGUAGE CPP, GADTs, ViewPatterns, MultiWayIf, DataKinds, BlockArguments, RankNTypes, ScopedTypeVariables, KindSignatures, TypeFamilies, DeriveLift, BangPatterns #-}
 
 module Data.Derive.TopDown.CxtGen where
 
@@ -11,7 +11,6 @@ import Data.Derive.TopDown.Lib
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax hiding (lift)
 import Language.Haskell.TH.ExpandSyns (expandSynsWith,noWarnTypeFamilies)
-import Control.Monad.Trans.State
 import Debug.Trace
 
 getCon g@(GadtC _ _ _) = [g]
@@ -21,6 +20,7 @@ getCon g = []
 -- ConT a1 a2 a3 .. -> [ConT a1, a2,a3]
 unappTy :: Type -> [Type]
 unappTy (AppT t1 t2) = unappTy t1 ++ [t2]
+unappTy (AppKindT ty kind) = unappTy ty
 unappTy t = [t]
 
 getConstrFields = tail.unappTy
@@ -233,13 +233,12 @@ getRole tn t2@(getTypeConstr -> (TupleT n)) =
                                           let ictRoles = replicate n R
                                           getRoleFromFields tn fields ictRoles
 
--- data I a = I (forall b . b)
+-- data I a = I (forall b . t)
+-- no need to handle the forall since the name a 
+-- will be unique in t
 getRole tn t2@(ForallT bnd cxt ty) = getRole tn ty
 getRole tn t2@(ForallVisT bnd ty) = getRole tn ty
 getRole tn f = return P -- not correct. There are other cases which needs to be handled
-
-
-
 
 type Prefix = String
 
@@ -314,10 +313,156 @@ inferICTRoles tn = do
                                                                     return r}  | con <- constrFields]) | tn <- vars]
                   return roles
 
+-- need to expand type synonym
+-- need to consider rank N forall quantifiers
+getContextType :: [Name] -> Type -> Q [Type]
+{-
+data T a = T a
+
+   a \in [a]   field = a
+--------------------------
+    a in context
+-}
+getContextType ns t@(VarT a) = if a `elem` ns
+                                then return $ [t]
+                                else return []
+{-
+data T a = T Int
+
+   a \not \in []  field Constr
+-------------------------------
+       [] 
+-}
+getContextType ns t@(ConT _) = return []
+
+
+{-
+data T k a = T (k a)
+
+   k \in [k, a],  field = k a
+---------------------------------
+        (k a) \in context
+
+ what if t contains other local type variable, need to consider forall?
+
+data T k a  = forall b . T a (k b)
+
+k b should in the context
+-}
+
+getContextType ns t@(getTypeConstr -> VarT cn) = do
+                                            -- nms <- ask
+                                            let varsInTy = getAllVarNames t
+                                            if all (\x -> x `elem` ns) varsInTy
+                                              then return [t]
+                                              else return []
+{-
+data T a = T (Maybe a)
+
+   role Maybe = [R]
+   field = Maybe a
+   a \in [a]
+-------------------------------------
+        a \in context
+
+data T k a = T (Maybe (k a))
+
+    role ConT = [R]
+    field = ConT (k a)
+    k is Nominal
+-------------------------------------
+          (k a) \in context
+-}
+getContextType ns t@(getTypeConstr -> ConT cn) = do 
+                                            -- if it is type family return Just t
+                                            -- else infer the roles and 
+                                            isTF <- isTypeFamily cn
+                                            if | isTF -> do 
+                                                  let varsInTy = getAllVarNames t
+                                                  if all (\x -> x `elem` ns) varsInTy
+                                                    then return [t]
+                                                    else return []
+                                               | otherwise -> do
+                                                   roles <- inferICTRoles cn
+                                                   let fields = getConstrFields t
+                                                   let field2RoleMap = zip fields roles
+                                                   -- only generate fields that are representative
+                                                   let repField2Role = filter (\(x,r) -> r == R) field2RoleMap
+                                                   tyss <- forM repField2Role $ \(x,R) -> getContextType ns x
+                                                   return $ concat tyss
+
+getContextType ns t@(ParensT ty) = getContextType ns ty
+
+getContextType ns t@(InfixT t1 n t2) = do 
+                                t1s <- getContextType ns t1
+                                t2s <- getContextType ns t2
+                                return $ t1s ++ t2s
+
+getContextType ns t@(getTypeConstr -> SigT ty kind) = getContextType ns ty
+
+getContextType ns t@(getTypeConstr -> TupleT i) = do
+                                            let fields = getConstrFields t
+                                            tyss <- forM fields $ \t -> getContextType ns t
+                                            return $ concat tyss
+
+getContextType ns t@(getTypeConstr -> ListT) = do
+                                            let fields = getConstrFields t
+                                            tyss <- forM fields $ \t -> getContextType ns t
+                                            return $ concat tyss
+
+-- ForallVisT -- GHC 8.10
+-- PromotedT Name
+-- UInfixT Type Name Type
+-- PromotedInfixT Type Name Type
+-- PromotedUInfixT Type Name Type
+-- UnboxedTupleT Int
+-- UnboxedSumT SumArity
+-- MulArrowT -- GHC 9.0
+-- PromotedTupleT Int
+-- PromotedNilT	 '[]
+-- PromotedConsT	 (':)
+-- ConstraintT Constraint
+-- LitT TyLit	 0,1,2, etc. -- return []
+-- WildCardT	should return []
+-- ImplicitParamT String Type	 ?x :: t
+getContextType ns t = return []
+
+getConTypes :: Con -> Q [Type]
+getConTypes (NormalC n bts)       = return $ map snd bts
+getConTypes (RecC  n bts)         = return $ map third bts
+getConTypes (InfixC t1 n t2)      = return $ map snd [t1, t2]
+getConTypes (ForallC bnd ctx con) = do 
+                                let varNames = map (getTVBName . voidTyVarBndrFlag) bnd
+                                getConTypes con
+getConTypes (GadtC n bts t)       = return $ map snd bts
+getConTypes (RecGadtC n bts t)    = return $ map third bts
+
+-- need expand type synonym
 -- ^ This function will get type class context from a data type
-getContext :: TypeName -> Q [Type]
-getContext tn = 
+getContextTypes :: TypeName -> Q [Type]
+getContextTypes tn = do 
+            (tvbs, cons) <- getTyVarCons tn
+            -- GHC 8.10
+            let vars :: [Name] = map (getTVBName . voidTyVarBndrFlag) tvbs
+            gadt <- isGadt tn
+            if gadt 
+              then do 
+                let gadtTyVarNames = map getTVBName tvbs
+                let gadtConsTyVarNames = getAllVarNames cons
+                let m = getGadtTyVarNameMap gadtConsTyVarNames gadtTyVarNames
+                let replaceCons = replaceAllNames m cons
+                conTys <- fmap concat $ forM replaceCons $ \con -> getConTypes con
+                ts     <- fmap concat $ forM conTys $ \ty -> getContextType vars ty
+                return ts
+              else do         
+                conTys <- fmap concat $ forM cons $ \con -> getConTypes con
+                ts     <- fmap concat $ forM conTys $ \ty -> getContextType vars ty
+                return ts
 
+foo tn = (getContextTypes tn) 
 
-generateClassContext :: ClassName -> TypeName -> Q [Cxt]
-generateClassContext = undefined
+generateClassContext1 :: ClassName -> TypeName -> Q Cxt
+generateClassContext1 cn tn = do 
+                        tys <- getContextTypes tn
+                        let cxt :: [Pred] = map (\ty -> AppT (ConT cn) ty) tys
+                        return cxt
