@@ -1,0 +1,72 @@
+name:                derive-topdown
+version:             0.1.0.0
+github:              "HaskellZhangSong/derive-topdown"
+license:             BSD3
+author:              "songzh"
+maintainer:          "Haskell.Zhang.Song@hotmail.com"
+copyright:           "2023 songzh"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+synopsis:            Derive type class instances
+category:            Development
+
+description: This package will make it easier to derive class instance for complex composited data types by using Template Haskell.        
+
+dependencies:
+- base >= 4.8 && < 5
+- template-haskell
+- syb
+- primitive
+- th-expand-syns
+- mtl
+- transformers
+- containers
+- th-abstraction
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+  default-extensions: 
+     TemplateHaskell
+   , StandaloneDeriving
+   , CPP
+  exposed-modules:
+  - Data.Derive.TopDown.Lib
+  - Data.Derive.Superclass
+  - Data.Derive.TopDown.IsInstance
+  - Data.Derive.TopDown.Instance
+  - Data.Derive.TopDown.CxtGen
+  - Data.Derive.TopDown.Standalone
+  - Data.Derive.TopDown.TH
+  - Data.Derive.TopDown
+
+tests:
+  derive-topdown-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Wno-missing-signatures
+    - -Wno-orphans
+    - -Wno-missing-export-lists
+
+    dependencies:
+    - derive-topdown
+    - HUnit
+    - haskell-src
+    - haskell-src-exts
+    - binary
