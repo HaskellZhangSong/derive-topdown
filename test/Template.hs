@@ -2,7 +2,6 @@
 module Template where
 import           Arity
 import           Data.Derive.TopDown.IsInstance
-import           Data.Derive.TopDown.TH
 import           Language.Haskell.Syntax
 import           Language.Haskell.TH.Syntax
                                          hiding ( Exp )

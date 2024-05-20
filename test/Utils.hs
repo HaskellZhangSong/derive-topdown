@@ -3,7 +3,6 @@
 module Utils where
 
 import           Language.Haskell.TH
-import           Language.Haskell.TH.Syntax
 
 qBoolToExp :: Q Bool -> Q Exp
 qBoolToExp q = do
