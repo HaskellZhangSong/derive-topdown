@@ -56,13 +56,27 @@ tests:
   derive-topdown-test:
     main:                Spec.hs
     source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -Wno-missing-signatures
-    - -Wno-orphans
-    - -Wno-missing-export-lists
+    when:
+    - condition: impl(ghc >= 8.6.1)
+      then:
+        ghc-options:
+        - -threaded
+        - -rtsopts
+        - -with-rtsopts=-N
+        - -Wno-missing-signatures
+        - -Wno-unticked-promoted-constructors
+        - -Wno-orphans
+        - -Wno-missing-export-lists
+        - -Wno-star-is-type
+      else:
+        ghc-options:
+        - -threaded
+        - -rtsopts
+        - -with-rtsopts=-N
+        - -Wno-missing-signatures
+        - -Wno-unticked-promoted-constructors
+        - -Wno-orphans
+        - -Wno-missing-export-lists
 
     dependencies:
     - derive-topdown
