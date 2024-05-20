@@ -114,7 +114,7 @@ isLeftMostAppTTypeVar _                           = return False
 -- not sure how to handle ArrowT with deriving yet
 isLeftMostAppTArrowT :: Type -> Bool
 isLeftMostAppTArrowT (getLeftMostType -> ArrowT)  = True
-#if __GLASGOW_HASKELL__ >= 901
+#if __GLASGOW_HASKELL__ >= 900
 isLeftMostAppTArrowT (getLeftMostType -> MulArrowT)  = True
 #endif
 isLeftMostAppTArrowT _ = False
@@ -132,7 +132,7 @@ isLeftMostAppTDataNewtype _                           = return False
 {-| 
   Get type variable name
 -}
-#if __GLASGOW_HASKELL__ >= 901
+#if __GLASGOW_HASKELL__ >= 900
 getTVBName :: TyVarBndr a -> Name
 getTVBName (PlainTV name _)    = name
 getTVBName (KindedTV name _ _) = name
@@ -153,7 +153,7 @@ unappTy t = [t]
 getConstrArgs :: Type -> [Type]
 getConstrArgs = tail . unappTy
 
-#if __GLASGOW_HASKELL__ >= 901
+#if __GLASGOW_HASKELL__ >= 900
 voidTyVarBndrFlag :: TyVarBndr flag -> TyVarBndr ()
 voidTyVarBndrFlag (PlainTV n _) = PlainTV n ()
 voidTyVarBndrFlag (KindedTV n _ k) = KindedTV n () k
@@ -169,7 +169,7 @@ isHigherOrderClass cn = do
     case cla of
         ClassI (ClassD _ _ vars _ _) _ 
             -> case head vars of
-#if __GLASGOW_HASKELL__ >= 901
+#if __GLASGOW_HASKELL__ >= 900
                   KindedTV _ _ k -> do 
 #else
                   KindedTV _ k -> do 
@@ -212,7 +212,7 @@ getAllConFields (RecGadtC _ _ _  ) = error "Should not use this to get fields of
 {-| data T a1 a2 = Con1 a1 | Con2 a2 ...
  return [a1, a2], [Con1 a1, Con2 a2]
 -}
-#if __GLASGOW_HASKELL__ >= 901
+#if __GLASGOW_HASKELL__ >= 900
 getTyVarCons :: TypeName -> Q ([TyVarBndr ()], [Con])
 #else
 getTyVarCons :: TypeName -> Q ([TyVarBndr], [Con])
@@ -231,7 +231,7 @@ getTyVarCons name = do
               PrimTyConI _ _ _ -> return ([], [])
               x -> error $ show x ++ " is not supported"
 
-#if __GLASGOW_HASKELL__ >= 901
+#if __GLASGOW_HASKELL__ >= 900
 getTyVarFields :: TypeName -> Q ([TyVarBndr ()], [Type])
 #else
 getTyVarFields :: TypeName -> Q ([TyVarBndr], [Type])

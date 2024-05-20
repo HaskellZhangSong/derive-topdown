@@ -142,7 +142,7 @@ doesFieldContainPotentialContext t = case t of
   UnboxedTupleT _       -> error "impossible field for UnboxedTupleT"
   UnboxedSumT   _       -> error "impossible field for UnboxedSumT"
   ArrowT                -> undefined -- should put app of Arrow into context?
-#if __GLASGOW_HASKELL__ >= 901
+#if __GLASGOW_HASKELL__ >= 900
   MulArrowT             -> undefined
 #endif
   EqualityT             -> error "impossible field for EqualityT"
