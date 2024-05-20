@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE MagicHash #-}  
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE CPP #-}
 #if __GLASGOW_HASKELL__ >= 806
 {-# LANGUAGE StarIsType #-}   
 #endif
@@ -167,9 +168,9 @@ $(deriving_th (''TypeArity, makeTypeArity) ''T5)
 
 -- GADTs
 data Exp a where
-    Add :: Int  Int Exp Int
-    And :: Bool Bool Exp Bool
-    Le  :: Int Int Exp Bool
+    Add :: Int  -> Int -> Exp Int
+    And :: Bool -> Bool -> Exp Bool
+    Le  :: Int  -> Int -> Exp Bool
 
 $(deriving_ ''Show ''Exp)
 $(deriving_th (''TypeArity, makeTypeArity) ''Exp)
@@ -183,12 +184,12 @@ data Aggregator = SUM | AVG | MIN | MAX | CNT | CNTD | ATTR
 data Granularity = G0 | G1
 
 data DataQL a where
-  DimRaw :: String DataQL G0
-  MsrRaw :: String DataQL G0
-  Agg :: Aggregator DataQL G0 DataQL G1
-  Include :: [DataQL G0] DataQL G1 DataQL G0
-  Exclude :: [DataQL G0] DataQL G1 DataQL G0
-  Fixed   :: [DataQL G0] DataQL G1 DataQL G0
+  DimRaw :: String -> DataQL G0
+  MsrRaw :: String -> DataQL G0
+  Agg :: Aggregator -> DataQL G0 -> DataQL G1
+  Include :: [DataQL G0] -> DataQL G1 -> DataQL G0
+  Exclude :: [DataQL G0] -> DataQL G1 -> DataQL G0
+  Fixed   :: [DataQL G0] -> DataQL G1 -> DataQL G0
 
 $(deriving_ ''Show ''DataQL)
 $(deriving_th (''TypeArity, makeTypeArity) ''DataQL)
