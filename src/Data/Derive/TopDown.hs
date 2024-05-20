@@ -16,7 +16,7 @@ module Data.Derive.TopDown (
  , module Data.Derive.TopDown.TH
  , module Data.Derive.TopDown.CxtGen
  , char, int, int8, int16, int32, int64, word, word8, word16, word32, word64
- , primitives, state, realWord
+ , primitives, state, realWorld
 #if __GLASGOW_HASKELL__ >= 802
  , stock, anyclass, newtype_
  , DerivStrategy(StockStrategy, AnyclassStrategy, NewtypeStrategy)
@@ -61,8 +61,10 @@ word64 = Name (mkOccName "Word64#") (NameG TcClsName (mkPkgName "ghc-prim") (mkM
 primitives :: [Name]
 primitives = [char, int, int8, int16, int32, int64, word, word8, word16, word32, word64]
 
+-- | @GHC.Prim.State#@ type
 state :: Name
 state  = Name (mkOccName "State#") (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
 
-realWord :: Name
-realWord  = Name (mkOccName "RealWord#") (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @GHC.Prim.RealWorld#@ type
+realWorld :: Name
+realWorld  = Name (mkOccName "RealWorld#") (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
