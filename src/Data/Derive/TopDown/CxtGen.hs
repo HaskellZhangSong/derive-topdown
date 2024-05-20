@@ -227,7 +227,7 @@ apply_until_fix_point tn = do
   let tn_fields' = fields env' ! tn
   if tn_fields == tn_fields' then return () else apply_until_fix_point tn
 
--- | put fields of data or newtype fields into map
+-- put fields of data or newtype fields into map
 gen_subst :: Name -> CIM ()
 gen_subst tn = do
   env <- get
@@ -313,11 +313,11 @@ genInferredContext cn tn = if cn == ''Generic
     ts <- fmap S.toList (evalStateT (inferContext tn) initEnv)
     return $ map (\t -> AppT (ConT cn) t) ts
 
-{-| Get wildcard context
--}
+-- | Generate wildcard context 
 genHoleContext :: ClassName -> TypeName -> Q Cxt
 genHoleContext _ _ = return [WildCardT]
 
+-- | Put all possible type fields of the type into context
 genAllFieldsContext :: ClassName -> TypeName -> Q Cxt
 genAllFieldsContext cn tn = if cn == ''Generic
   then return []

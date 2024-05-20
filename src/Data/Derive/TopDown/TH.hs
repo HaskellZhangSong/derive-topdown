@@ -73,5 +73,8 @@ deriving_thss cds typeNames =
   fmap concat (mapM (\t -> deriving_ths cds t) typeNames)
 
 deriving_th_with
-  :: (ClassName, Name -> Q [Dec]) -> TypeName -> [TypeName] -> Q [Dec]
+  :: (ClassName, Name -> Q [Dec]) -- ^ class name and corresponding instance generation function
+  -> TypeName    -- ^ type name
+  -> [TypeName]  -- ^ type name list that breaks deriving process
+  -> Q [Dec]
 deriving_th_with cd tname bs = evalStateT (genTH cd tname bs) []

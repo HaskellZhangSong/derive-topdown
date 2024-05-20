@@ -37,7 +37,6 @@ import Language.Haskell.TH.Datatype (
     DatatypeInfo(..),
     reifyDatatype
     )
-import Debug.Trace
 
 type ClassName = Name
 type TypeName = Name
@@ -94,7 +93,7 @@ isDataNewtype tn = do
                   TyConI (DataD _ _ _ _ _ _)    -> return True
                   TyConI (NewtypeD _ _ _ _ _ _) -> return True 
                   _                             -> return False
--- TODO: infixed type operator needs to return the operator
+
 {-
   For type appications like @(k a b)@, @Either Int a@, we always need to 
   get the left most type in such cases
@@ -309,7 +308,7 @@ getCompositeTypeNames (ForallC _ _ con) = getCompositeTypeNames con
 getCompositeTypeNames (GadtC _ bangtype _) = expandSynsAndGetTypeNames (map snd bangtype)
 getCompositeTypeNames (RecGadtC _ bangtypes _) = expandSynsAndGetTypeNames (map third bangtypes)
 
-{- 
+{-
 Here, I just replace forall type into Any type since in the deriving clause generation
 process, we cannot really do anything about the quantified type vars. 
 if @data C b = C (forall a. Show a => a) b@ need to derive Eq, it will failed anyway. 
