@@ -66,16 +66,23 @@ deriving_superclasses' st cn tn = do
           return $ topClassInstance ++ ss
         _ -> error $ show cn ++ "is not type class"
 
-{- | Not for mutual recursive types
-For mutual recursive types, you need to put them together
-@fmap concat (sequence [(deriving_superclasses ''Ord ''T2), (deriving_superclasses ''Ord ''T3)])@
+{- | Note: It cannot be used with mutual recursive types.
+
+For mutual recursive types, you need to put them together. For mutual recursive types @T1@ and @T2@:
+
+@
+fmap concat (sequence [(deriving_superclasses ''Ord ''T1), (deriving_superclasses ''Ord ''T2)])
+@
 -}
 deriving_superclasses :: ClassName -> TypeName -> Q [Dec]
 deriving_superclasses cn tn =
   evalStateT (deriving_superclasses' Nothing cn tn) []
 
 strategy_deriving_superclasses
-  :: DerivStrategy -> ClassName -> TypeName -> Q [Dec]
+  :: DerivStrategy  -- ^ deriving strategy
+  -> ClassName      -- ^ class name
+  -> TypeName       -- ^ type name
+  -> Q [Dec]
 strategy_deriving_superclasses st cn tn =
   evalStateT (deriving_superclasses' (Just st) cn tn) []
 
