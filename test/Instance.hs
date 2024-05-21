@@ -84,8 +84,16 @@ binaryRx3 = TestCase
     $((qBoolToExp $ isInstance' ''Binary  [apps [ConT ''Rx3, VarT (mkName "a"), VarT (mkName "b")]]))
   )
 
+binaryE = TestCase
+  (assertEqual
+    "E is instance of Binary"
+    True
+    $((qBoolToExp $ isInstance' ''Binary  [apps [ConT ''E, VarT (mkName "a"), VarT (mkName "b")]]))
+  )
+
 binaryHsModule = TestCase
   (assertEqual "HsModule is instance of Binary"
                True
                $((qBoolToExp $ isInstance' ''Binary  [ConT ''HsModule]))
   )
+

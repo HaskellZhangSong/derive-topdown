@@ -82,6 +82,7 @@ instances = TestList
   , binaryR6
   , binaryRx0
   , binaryRx3
+  , binaryE
   , binaryHsModule
   ]
 

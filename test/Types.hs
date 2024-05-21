@@ -17,6 +17,10 @@
 {-# LANGUAGE TypeFamilies #-}            
 {-# LANGUAGE FlexibleContexts #-}            
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE DeriveAnyClass #-}
+
+
 
 module Types where
 import           Arity
@@ -248,7 +252,9 @@ $(deriving_ ''Generic ''P)
 $(deriving_ ''Functor ''P)
 $(deriving_ ''Generic1 ''P)
 $(deriving_th (''TypeArity, makeTypeArity) ''P)
+$(deriving_with ''Binary ''E Nothing [] genHoleContext)
 
+-- $(instance_with ''Binary ''E  [] Nothing genHoleContext)
 -- GHC deriving does not work on ForallT 
 data C b = C (forall a. Show a => a) b | C2 Int b (Maybe Bool)
 
