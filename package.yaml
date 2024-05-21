@@ -43,7 +43,6 @@ library:
    , StandaloneDeriving
    , CPP
   exposed-modules:
-  - Data.Derive.TopDown.Lib
   - Data.Derive.Superclass
   - Data.Derive.TopDown.IsInstance
   - Data.Derive.TopDown.Instance
@@ -51,6 +50,8 @@ library:
   - Data.Derive.TopDown.Standalone
   - Data.Derive.TopDown.TH
   - Data.Derive.TopDown
+  other-modules:
+  - Data.Derive.TopDown.Lib
 
 tests:
   derive-topdown-test:
