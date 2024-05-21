@@ -8,11 +8,11 @@ There are functions named `deriving_`, `derivings`, `derivingss`. Please see the
 
 ``` haskell
 {-# LANGUAGE StandaloneDeriving,
-	ConstraintKinds,
-	UndecidableInstances,
-	GADTs,
-	TemplateHaskell,
-	DeriveGeneric #-}
+    ConstraintKinds,
+    UndecidableInstances,
+    GADTs,
+    TemplateHaskell,
+    DeriveGeneric #-}
 {-# OPTIONS_GHC -ddump-splices #-}
 
 import Data.Derive.TopDown
@@ -25,10 +25,10 @@ data Gender = Male | Female
 type Age = Int
 data Person a = P {name :: String , age :: Int, gender :: Gender}
 data Department a = D {dname :: String , 
-						head :: Person a, 
-						staff :: [Person a]}
+                        head :: Person a, 
+                        staff :: [Person a]}
 data Company a = C {cname :: String, 
-					departments :: [Department a]}
+                    departments :: [Department a]}
 
 derivings [''Eq, ''Ord, ''Generic] ''Company
 ```
@@ -65,30 +65,30 @@ instance Binary a_af4Y => Binary (Company a_af4Y)
 For generating instances with a template Haskell function, `derivingTH`, `derivingTHs` and `derivingTHss` can be used:
 ```haskell
 derivingTHs
-	[(''ToJSON, deriveToJSON defaultOptions),
-	(''FromJSON, deriveFromJSON defaultOptions)]
-	''Company
+    [(''ToJSON, deriveToJSON defaultOptions),
+    (''FromJSON, deriveFromJSON defaultOptions)]
+    ''Company
 ======>
 instance ToJSON Gender where
-	toJSON
-	= \ value_amQG
-		-> case value_amQG of {
-				Male -> String (text-1.2.2.2:Data.Text.pack "Male")
-				Female -> String (text-1.2.2.2:Data.Text.pack "Female") }
-	toEncoding
-	= \ value_amQH
-		-> case value_amQH of {
-				Male
-				-> Data.Aeson.Encoding.Internal.text
-					(text-1.2.2.2:Data.Text.pack "Male")
-				Female
-				-> Data.Aeson.Encoding.Internal.text
-					(text-1.2.2.2:Data.Text.pack "Female") }
+    toJSON
+    = \ value_amQG
+        -> case value_amQG of {
+                Male -> String (text-1.2.2.2:Data.Text.pack "Male")
+                Female -> String (text-1.2.2.2:Data.Text.pack "Female") }
+    toEncoding
+    = \ value_amQH
+        -> case value_amQH of {
+                Male
+                -> Data.Aeson.Encoding.Internal.text
+                    (text-1.2.2.2:Data.Text.pack "Male")
+                Female
+                -> Data.Aeson.Encoding.Internal.text
+                    (text-1.2.2.2:Data.Text.pack "Female") }
 instance ToJSON a_amqg => ToJSON (Person a_amqg) where
-	toJSON
-	= \ value_amQy
-	...
-	...
+    toJSON
+    = \ value_amQy
+    ...
+    ...
 ```
 You can use this this function with [`derive`](http://hackage.haskell.org/package/derive) package. However, it seems that this package is broken with GHC >= 802.
 
