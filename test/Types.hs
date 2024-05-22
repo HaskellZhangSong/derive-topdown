@@ -252,7 +252,11 @@ $(deriving_ ''Generic ''P)
 $(deriving_ ''Functor ''P)
 $(deriving_ ''Generic1 ''P)
 $(deriving_th (''TypeArity, makeTypeArity) ''P)
+#if __GLASGOW_HASKELL__ >= 804
 $(deriving_with ''Binary ''E Nothing [] genHoleContext)
+#else
+$(deriving_with ''Binary ''E Nothing [] genInferredContext)
+#endif
 
 -- $(instance_with ''Binary ''E  [] Nothing genHoleContext)
 -- GHC deriving does not work on ForallT 

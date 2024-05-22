@@ -2,9 +2,9 @@ name:                derive-topdown
 version:             0.1.0.0
 github:              "HaskellZhangSong/derive-topdown"
 license:             BSD3
-author:              "songzh"
-maintainer:          "Haskell.Zhang.Song@hotmail.com"
-copyright:           "2023 songzh"
+author:              "Song Zhang"
+maintainer:          "Song Zhang <Haskell.Zhang.Song@hotmail.com>"
+copyright:           "(c) 2024 Song Zhang"
 
 extra-source-files:
 - README.md
@@ -14,6 +14,18 @@ synopsis:            Derive type class instances
 category:            Development
 
 description: This package will make it easier to derive class instance for complex composited data types by using Template Haskell.        
+
+tested-with:   GHC == 8.2.2
+             , GHC == 8.4.4
+             , GHC == 8.6.5
+             , GHC == 8.8.4
+             , GHC == 8.10.7
+             , GHC == 9.0.2
+             , GHC == 9.2.8
+             , GHC == 9.4.8
+             , GHC == 9.6.5
+             , GHC == 9.8.2
+             , GHC == 9.10.1
 
 dependencies:
 - base >= 4.8 && < 5
@@ -31,10 +43,13 @@ ghc-options:
 - -Widentities
 - -Wincomplete-record-updates
 - -Wincomplete-uni-patterns
-- -Wmissing-export-lists
-- -Wmissing-home-modules
-- -Wpartial-fields
 - -Wredundant-constraints
+
+if flag(ghc >= 8.2.1):
+  ghc-options: 
+    - -Wpartial-fields
+    - -Wmissing-home-modules
+    - -Wmissing-export-lists
 
 library:
   source-dirs: src
@@ -83,5 +98,4 @@ tests:
     - derive-topdown
     - HUnit
     - haskell-src
-    - haskell-src-exts
     - binary
