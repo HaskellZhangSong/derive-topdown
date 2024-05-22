@@ -43,18 +43,39 @@ anyclass  = AnyclassStrategy
 newtype_  = NewtypeStrategy
 #endif
 
--- | Primitive types with hashes that may cause to stop the generation process
-char, int, int8, int16, int32, int64, word, word8, word16, word32, word64 :: Name
+
+-- | @Char#@ type
+char :: Name
 char   = Name (mkOccName "Char#")   (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Int#@ type
+int :: Name
 int    = Name (mkOccName "Int#")    (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Int8#@ type
+int8 :: Name
 int8   = Name (mkOccName "Int8#")   (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Int16#@ type
+int16 :: Name
 int16  = Name (mkOccName "Int16#")  (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Int32#@ type
+int32 :: Name
 int32  = Name (mkOccName "Int32#")  (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Int64#@ type
+int64 :: Name
 int64  = Name (mkOccName "Int64#")  (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Word#@ type
+word :: Name
 word   = Name (mkOccName "Word#")   (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Word8#@ type
+word8 :: Name
 word8  = Name (mkOccName "Word8#")  (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Word16#@ type
+word16 :: Name
 word16 = Name (mkOccName "Word16#") (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Word32#@ type
+word32 :: Name
 word32 = Name (mkOccName "Word32#") (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+-- | @Word64#@ type
+word64 :: Name
 word64 = Name (mkOccName "Word64#") (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
 
 -- | list of @Name@: @[char, int, int8, int16, int32, int64, word, word8, word16, word32, word64]@
