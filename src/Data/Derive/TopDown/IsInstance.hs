@@ -59,10 +59,6 @@ remove_explicit_forall_trans :: Type -> Type
 remove_explicit_forall_trans = everywhere (mkT remove_explicit_forall)
 
 isInstance' :: ClassName -> [Type] -> Q Bool
-isInstance' cls tys = if cls == ''Typeable
-                        -- After GHC 7.10, GHC will generate Typeable 
-                        -- instance for all types, so this could be fine.
-  then return True
-  else
+isInstance' cls tys =
     let trans = remove_explicit_forall_trans . replace_poly_type_trans
-    in  isInstance cls (map trans tys)
+      in  isInstance cls (map trans tys)
