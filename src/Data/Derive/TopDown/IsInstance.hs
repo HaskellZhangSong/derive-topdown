@@ -14,7 +14,7 @@ module Data.Derive.TopDown.IsInstance
   ( isInstance'
   ) where
 
-import           Data.Derive.TopDown.Lib
+import           Data.Derive.TopDown.Types
 import           Data.Generics
 import           GHC.Exts
 {-

@@ -32,16 +32,12 @@ import Control.Monad.State
 import Control.Monad.Trans
 import Control.Applicative
 import Control.Monad
+import Data.Derive.TopDown.Types
 import Language.Haskell.TH.Datatype (
     ConstructorInfo(..),
     DatatypeInfo(..),
     reifyDatatype
     )
-
-type ClassName = Name
-type TypeName = Name
-
-type ContextGenderator = ClassName -> TypeName -> Q Cxt
 
 noWarnExpandSynsWith :: Type -> Q Type
 noWarnExpandSynsWith = expandSynsWith noWarnTypeFamilies

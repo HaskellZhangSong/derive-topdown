@@ -34,6 +34,7 @@ import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.State
 import Data.Derive.TopDown.IsInstance
+import Data.Derive.TopDown.Types
 import Data.List (foldl1')
 import Data.Primitive.Types
 import GHC.Generics
@@ -51,7 +52,7 @@ gen_standalone_deriving_decl :: ClassName
                           -> TypeName
                           -> Maybe DerivStrategy  
                           -> [TypeName]  -- ^ a list of types that breaks the generation process
-                          -> ContextGenderator -- ^ a context generator
+                          -> ContextGenerator -- ^ a context generator
                           -> StateT [Type] Q [Dec]
 gen_standalone_deriving_decl cn tn st breaks cg = do
                        (tvbs, cons) <- lift $ getTyVarCons tn
@@ -168,6 +169,6 @@ deriving_with :: ClassName
               -> TypeName
               -> Maybe DerivStrategy -- ^ deriving strategy
               -> [TypeName]        -- ^ a list of types that breaks the generation process
-              -> ContextGenderator -- ^ a context generator,  @genInferredContext@, @genHoleContext@ or @genAllFieldsContext@
+              -> ContextGenerator -- ^ a context generator,  @genInferredContext@, @genHoleContext@ or @genAllFieldsContext@
               -> Q [Dec]
 deriving_with cn tn st bs cg = evalStateT (gen_standalone_deriving_decl cn tn st bs cg) []

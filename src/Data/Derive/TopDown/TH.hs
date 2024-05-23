@@ -21,6 +21,7 @@ module Data.Derive.TopDown.TH
 import           Control.Monad.State
 import           Data.Derive.TopDown.IsInstance ( isInstance' )
 import           Data.Derive.TopDown.Lib
+import           Data.Derive.TopDown.Types
 import           Data.List                      ( foldl1' )
 import           Language.Haskell.TH
 

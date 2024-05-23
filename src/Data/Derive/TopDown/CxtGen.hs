@@ -9,10 +9,12 @@
 -- Portability :  non-portable
 --
 -----------------------------------------------------------------------------
+
 module Data.Derive.TopDown.CxtGen
   ( genInferredContext
   , genHoleContext
   , genAllFieldsContext
+  , ContextGenerator
   ) where
 
 {-
@@ -35,6 +37,7 @@ import           Control.Monad
 import           Control.Monad.State
 import qualified Control.Monad.Trans           as T
 import           Data.Derive.TopDown.Lib
+import           Data.Derive.TopDown.Types
 import qualified Data.List                     as L
 import qualified Data.Map                      as M
 import           Data.Map                       ( (!)

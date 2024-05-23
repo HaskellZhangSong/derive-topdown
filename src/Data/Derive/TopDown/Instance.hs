@@ -23,6 +23,7 @@ import           Control.Monad.State
 import           Data.Derive.TopDown.CxtGen     ( genInferredContext )
 import           Data.Derive.TopDown.IsInstance
 import           Data.Derive.TopDown.Lib
+import           Data.Derive.TopDown.Types
 import           Data.List                      ( foldl1' )
 import           Language.Haskell.TH
 
@@ -31,7 +32,7 @@ gen_instance_decl
   -> TypeName
   -> [TypeName]  -- ^ a list of types that breaks the generation process
   -> Maybe Overlap
-  -> ContextGenderator -- ^ a context generator
+  -> ContextGenerator -- ^ a context generator
   -> StateT [Type] Q [Dec]
 gen_instance_decl cn tn breaks mo cg = do
   (tvbs, cons) <- lift $ getTyVarCons tn
@@ -100,6 +101,6 @@ instance_with
   -> TypeName
   -> [TypeName]        -- ^ a list of types that breaks the generation process
   -> Maybe Overlap
-  -> ContextGenderator -- ^ a context generator
+  -> ContextGenerator -- ^ a context generator
   -> Q [Dec]
 instance_with cn tn bs mo cg = evalStateT (gen_instance_decl cn tn bs mo cg) []

@@ -23,6 +23,7 @@ import           Control.Monad.Trans.State
 import           Data.Derive.TopDown.CxtGen
 import           Data.Derive.TopDown.IsInstance
 import           Data.Derive.TopDown.Lib
+import           Data.Derive.TopDown.Types
 import           Data.List                      ( foldl1'
                                                 , nub
                                                 )

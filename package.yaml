@@ -61,6 +61,7 @@ library:
   - Data.Derive.TopDown.CxtGen
   - Data.Derive.TopDown.Standalone
   - Data.Derive.TopDown.TH
+  - Data.Derive.TopDown.Types
   - Data.Derive.TopDown
   other-modules:
   - Data.Derive.TopDown.Lib
