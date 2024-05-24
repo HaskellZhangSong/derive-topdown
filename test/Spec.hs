@@ -1,3 +1,5 @@
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE CPP #-}
 module Main where
 
 import           Control.Monad
@@ -6,6 +8,7 @@ import           Generic
 import           Instance
 import           Template
 import           Test.HUnit
+import           GhcTest
 
 derive = TestList
   [ eqPerson
@@ -113,9 +116,13 @@ templates = TestList
   , arityHsModule
   , arityHsDecl
   ]
+
+ghcAst = TestList [genericGhcHsModule]
+
 main :: IO ()
 main = do
   void $ runTestTT derive
   void $ runTestTT generic
   void $ runTestTT instances
   void $ runTestTT templates
+  void $ runTestTT ghcAst

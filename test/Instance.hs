@@ -1,13 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PackageImports #-}
 module Instance where
 
 import           Data.Binary
 import           Data.Derive.TopDown.IsInstance
-import           Language.Haskell.Syntax
 import           Language.Haskell.TH.Syntax
 import           Test.HUnit
 import           Types
 import           Utils
+import qualified "haskell-src"  Language.Haskell.Syntax as H
 
 binaryCompany = TestCase
   (assertEqual "Company is instance of Binary"
@@ -94,6 +95,6 @@ binaryE = TestCase
 binaryHsModule = TestCase
   (assertEqual "HsModule is instance of Binary"
                True
-               $((qBoolToExp $ isInstance' ''Binary  [ConT ''HsModule]))
+               $((qBoolToExp $ isInstance' ''Binary  [ConT ''H.HsModule]))
   )
 

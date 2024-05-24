@@ -1,8 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PackageImports #-}
+
 module Template where
 import           Arity
 import           Data.Derive.TopDown.IsInstance
-import           Language.Haskell.Syntax
+import qualified "haskell-src"  Language.Haskell.Syntax as H
 import           Language.Haskell.TH.Syntax
                                          hiding ( Exp )
 import           Test.HUnit
@@ -153,12 +155,12 @@ arityHsModule = TestCase
   (assertEqual
     "HsModule is instance of Arity"
     True
-    $((qBoolToExp $ isInstance' ''TypeArity [apps [ConT ''HsModule]]))
+    $((qBoolToExp $ isInstance' ''TypeArity [apps [ConT ''H.HsModule]]))
   )
 
 arityHsDecl = TestCase
   (assertEqual
     "HsDecl is instance of Arity"
     True
-    $((qBoolToExp $ isInstance' ''TypeArity [apps [ConT ''HsDecl]]))
+    $((qBoolToExp $ isInstance' ''TypeArity [apps [ConT ''H.HsDecl]]))
   )

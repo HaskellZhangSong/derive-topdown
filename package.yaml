@@ -98,3 +98,5 @@ tests:
     - HUnit
     - haskell-src
     - binary
+    - ghc
+    - bytestring

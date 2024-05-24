@@ -1,14 +1,14 @@
-{-# LANGUAGE TemplateHaskell, StandaloneDeriving #-}
-
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PackageImports #-}
 
 module Derive where
 import           Control.Monad.IO.Class
 import           Data.Derive.TopDown.IsInstance
-import           Language.Haskell.Syntax
 import           Language.Haskell.TH     hiding ( Exp )
 import           Test.HUnit
 import           Types
 import           Utils
+import qualified "haskell-src"  Language.Haskell.Syntax as H
 
 eqPerson = TestCase
   (assertEqual "Person is instance of Eq"
@@ -179,11 +179,11 @@ realFloatF32 = TestCase
 ordHsModule = TestCase
   (assertEqual "HsModule is instance of Ord"
                True
-               $((qBoolToExp $ isInstance' ''Ord [apps [ConT ''HsModule]]))
+               $((qBoolToExp $ isInstance' ''Ord [apps [ConT ''H.HsModule]]))
   )
 
 ordHsDecl = TestCase
   (assertEqual "HsModule is instance of Ord"
                True
-               $((qBoolToExp $ isInstance' ''Ord [apps [ConT ''HsDecl]]))
+               $((qBoolToExp $ isInstance' ''Ord [apps [ConT ''H.HsDecl]]))
   )

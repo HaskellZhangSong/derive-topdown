@@ -19,7 +19,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE DeriveAnyClass #-}
-
+{-# LANGUAGE PackageImports #-}
 
 
 module Types where
@@ -28,12 +28,14 @@ import           Control.Monad.IO.Class
 import           Data.Binary
 import           Data.Derive.Superclass
 import           Data.Derive.TopDown
+import           Data.Derive.TopDown.Breaks
 import           Data.Proxy
 import           Data.Ratio
 import           GHC.Generics            hiding ( C
                                                 , D
                                                 )
-import           Language.Haskell.Syntax
+import qualified "haskell-src"  Language.Haskell.Syntax as H
+
 -- types for testing
 
 -- ^ simple cases
@@ -282,7 +284,8 @@ $(strategy_deriving_superclasses NewtypeStrategy ''RealFloat ''F32)
 $(deriving_th (''TypeArity, makeTypeArity) ''F32)
 
 -- deriving GHC syntax tree in haskell-src
-$(deriving_ ''Ord ''HsModule)
-$(deriving_with ''Generic ''HsModule Nothing [''Ratio] genInferredContext)
-$(instance_ ''Binary ''HsModule)
-$(deriving_th (''TypeArity, makeTypeArity) ''HsModule)
+$(deriving_ ''Ord ''H.HsModule)
+$(deriving_with ''Generic ''H.HsModule Nothing [''Ratio] genInferredContext)
+$(instance_ ''Binary ''H.HsModule)
+$(deriving_th (''TypeArity, makeTypeArity) ''H.HsModule)
+
