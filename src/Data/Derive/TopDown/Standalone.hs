@@ -81,8 +81,7 @@ gen_standalone_deriving_decl cn tn st breaks cg = do
                            let isGeneric1 = ''Generic1 == cn
                            table <- get
                            if isMember || elem instanceType table || elem tn breaks ||
-                              (isPrimitive && (isGeneric || isGeneric1)) || 
-                              (tn == ''Integer && (isGeneric || isGeneric1))
+                              isPrimitive || (tn == ''Integer && (isGeneric || isGeneric1))
                               then return []
                               else do
                                  classContext <- if isCnHighOrderClass 

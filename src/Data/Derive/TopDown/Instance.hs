@@ -25,7 +25,9 @@ import           Data.Derive.TopDown.IsInstance
 import           Data.Derive.TopDown.Lib
 import           Data.Derive.TopDown.Types
 import           Data.List                      ( foldl1' )
+import           Data.Primitive.Types
 import           Language.Haskell.TH
+
 
 gen_instance_decl
   :: ClassName
@@ -52,7 +54,8 @@ gen_instance_decl cn tn breaks mo cg = do
         else return saturatedType
       isMember <- lift $ isInstance' cn [instanceType]
       table    <- get
-      if isMember || elem instanceType table || elem tn breaks
+      isPrimitive <-lift $ isInstance' ''Prim [saturatedType]
+      if isMember || elem instanceType table || elem tn breaks || isPrimitive
          -- normally empty instance will not be used to derive Generic
          -- so I do not check Generic and Generic1
         then return []
