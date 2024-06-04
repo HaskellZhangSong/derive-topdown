@@ -50,6 +50,7 @@ import qualified Data.Set                      as S
 import           Data.Set                       ( Set )
 import           GHC.Generics
 import           Language.Haskell.TH
+import           Debug.Trace
 
 data Env = Env
   { inferring    :: [Name]             -- ^ encountered types during infer process
@@ -131,34 +132,34 @@ doesFieldContainPotentialContext t = case t of
   SigT     ty _  -> doesFieldContainPotentialContext ty
   VarT      _    -> return True
   ConT      _    -> return False
-  PromotedT _    -> error "impossible field for PromotedT"
+  PromotedT _    -> traceM "impossible field for PromotedT" >> error ""
   InfixT t1 _ t2 -> liftA2 (||)
                            (doesFieldContainPotentialContext t1)
                            (doesFieldContainPotentialContext t2)
-  UInfixT         _ _ _ -> error "impossible field for UInfixT"
+  UInfixT         _ _ _ -> traceM "impossible field for UInfixT" >> error ""
 #if __GLASGOW_HASKELL__ >= 904
-  PromotedInfixT  _ _ _ -> error "impossible field for PromotedInfixT"
-  PromotedUInfixT _ _ _ -> error "impossible field for PromotedUInfixT"
+  PromotedInfixT  _ _ _ -> traceM "impossible field for PromotedInfixT" >> error ""
+  PromotedUInfixT _ _ _ -> traceM "impossible field for PromotedUInfixT" >> error ""
 #endif
   ParensT       ty      -> doesFieldContainPotentialContext ty
-  TupleT        _       -> error "impossible field for TupleT"
-  UnboxedTupleT _       -> error "impossible field for UnboxedTupleT"
-  UnboxedSumT   _       -> error "impossible field for UnboxedSumT"
+  TupleT        _       -> traceM "impossible field for TupleT" >> error ""
+  UnboxedTupleT _       -> traceM "impossible field for UnboxedTupleT" >> error ""
+  UnboxedSumT   _       -> traceM "impossible field for UnboxedSumT" >> error ""
   ArrowT                -> undefined -- should put app of Arrow into context?
 #if __GLASGOW_HASKELL__ >= 900
   MulArrowT             -> undefined
 #endif
-  EqualityT             -> error "impossible field for EqualityT"
-  ListT                 -> error "impossible field for ListT"
-  PromotedTupleT _      -> error "impossible field for PromotedTupleT"
-  PromotedNilT          -> error "impossible field for PromotedNilT"
-  PromotedConsT         -> error "impossible field for PromotedConsT"
-  StarT                 -> error "impossible field for StarT"
-  ConstraintT           -> error "impossible field for ConstraintT"
-  LitT _                -> error "impossible field for LitT"
-  WildCardT             -> error "impossible field for WildCardT"
+  EqualityT             -> traceM "impossible field for EqualityT" >> error ""
+  ListT                 -> traceM "impossible field for ListT" >> error ""
+  PromotedTupleT _      -> traceM "impossible field for PromotedTupleT" >> error ""
+  PromotedNilT          -> traceM "impossible field for PromotedNilT" >> error ""
+  PromotedConsT         -> traceM "impossible field for PromotedConsT" >> error ""
+  StarT                 -> traceM "impossible field for StarT" >> error ""
+  ConstraintT           -> traceM "impossible field for ConstraintT" >> error ""
+  LitT _                -> traceM "impossible field for LitT" >> error ""
+  WildCardT             -> traceM "impossible field for WildCardT" >> error ""
 #if __GLASGOW_HASKELL__ >= 808
-  ImplicitParamT _ _    -> error "impossible field for ImplicitParamT"
+  ImplicitParamT _ _    -> traceM "impossible field for ImplicitParamT" >> error ""
 #endif
 
 -- | a lazily applied type paramters lookup function
@@ -273,7 +274,7 @@ gen_subst tn = do
             map (VarT . mkName) [ 'a' : show x | x <- [1 .. n] ]
       assert (length args == length tup_param_names)
              (modify (putSubst tn t (zip tup_param_names args)))
-    err_t -> error $ "gen_subst does not support type: " ++ show err_t
+    err_t -> traceM $ "gen_subst does not support type: " ++ show err_t >> error ""
 
 subst_data_newtype :: Name -> CIM ()
 subst_data_newtype tn = do
@@ -307,7 +308,7 @@ subst_data_newtype tn = do
             S.union (S.fromList new_context) (S.delete t (fields e ! tn))
       modify $ putFields tn new_tn_fields
     err_ty ->
-      error $ "subst_data_newtype does not support type: " ++ show err_ty
+      traceM $ "subst_data_newtype does not support type: " ++ show err_ty >> error ""
 
 genInferredContext :: ClassName -> TypeName -> Q Cxt
 genInferredContext cn tn = if cn == ''Generic

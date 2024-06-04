@@ -38,7 +38,7 @@ import Language.Haskell.TH.Datatype (
     DatatypeInfo(..),
     reifyDatatype
     )
-
+import Debug.Trace (trace, traceM)
 noWarnExpandSynsWith :: Type -> Q Type
 noWarnExpandSynsWith = expandSynsWith noWarnTypeFamilies
 
@@ -60,7 +60,7 @@ substitute (VarT m, t) x@(VarT n) = if n == m
                                     then t
                                     else x
 substitute (VarT _, _) x = x
-substitute (t, _) x = error $ "cannot substitute " ++ show t ++ " with " ++ show x
+substitute (t, _) x = trace ("cannot substitute " ++ show t ++ " with " ++ show x) (error "")
 
 substituteVar :: (Type, Type) -> Type -> Type
 substituteVar s = everywhere (mkT (substitute s))
@@ -173,8 +173,8 @@ isHigherOrderClass cn = do
                               if k == StarT
                                 then return False
                                 else return True
-                  _ -> error $ "Cannot reify kind of class " ++ show cn
-        _ -> error $ show cn ++ " is not a class"
+                  _ -> traceM ("Cannot reify kind of class " ++ show cn) >> error ""
+        _ -> traceM (show cn ++ " is not a class") >> error ""
 
 getGadtCon :: Con -> [Con]
 getGadtCon g@(GadtC _ _ _) = [g]
@@ -202,8 +202,8 @@ getAllConFields (InfixC   bt1   _    bt2) = [snd bt1] ++ [snd bt2]
 getAllConFields (ForallC  tvb   _  con)   = let ns = map (getTVBName. voidTyVarBndrFlag) tvb
                                               in getAllConFields (replaceVarInForallTypeTrans ns con)
 -- https://gitlab.haskell.org/ghc/ghc/-/issues/13885#note_476439
-getAllConFields (GadtC    _ _ _  ) = error "Should not use this to get fields of GADT"
-getAllConFields (RecGadtC _ _ _  ) = error "Should not use this to get fields of GADT"
+getAllConFields (GadtC    _ _ _  ) = trace "Should not use this to get fields of GADT" (error "")
+getAllConFields (RecGadtC _ _ _  ) = trace "Should not use this to get fields of GADT" (error "")
 
 {-| data T a1 a2 = Con1 a1 | Con2 a2 ...
  return [a1, a2], [Con1 a1, Con2 a2]
@@ -220,12 +220,13 @@ getTyVarCons name = do
                 case dec of
                   DataD    _ _ tvbs _ cons _  -> return (map voidTyVarBndrFlag tvbs, cons)
                   NewtypeD _ _ tvbs _ con  _  -> return (map voidTyVarBndrFlag tvbs, [con])
-                  TySynD   _ _ _        -> error $ show name ++ " is a type synonym and `TypeSynonymInstances' is not supported.\n"
-                      ++ "If you did not derive it then this is a bug, please report this bug to the author of `derive-topdown' package."
+                  TySynD   _ _ _        -> traceM (show name ++ " is a type synonym and `TypeSynonymInstances' is not supported."
+                      ++ "If you did not derive it then this is a bug, please report this bug to the author of `derive-topdown' package.") 
+                      >> (error "")
                   x -> do
-                      error $ pprint (x :: Dec) ++ " is not a data or newtype definition."
+                      traceM (pprint (x :: Dec) ++ " is not a data or newtype definition.") >> error ""
               PrimTyConI _ _ _ -> return ([], [])
-              x -> error $ show x ++ " is not supported"
+              x -> traceM (show x ++ " is not supported") >> error ""
 
 #if __GLASGOW_HASKELL__ >= 900
 getTyVarFields :: TypeName -> Q ([TyVarBndr ()], [Type])
@@ -249,11 +250,12 @@ getTyVarFields name = do
                       else do
                         return $ (map voidTyVarBndrFlag tvbs, getAllConsFields cons)
                   NewtypeD _ _ tvbs _ con  _  -> return (map voidTyVarBndrFlag tvbs, getAllConsFields [con])
-                  TySynD   _ _ _        -> error $ show name ++ " is a type synonym and `TypeSynonymInstances' is not supported.\n"
-                      ++ "If you did not derive it then this is a bug, please report this bug to the author of `derive-topdown' package."
+                  TySynD   _ _ _        -> traceM (show name ++ " is a type synonym and `TypeSynonymInstances' is not supported.\n"
+                      ++ "If you did not derive it then this is a bug, please report this bug to the author of `derive-topdown' package.")
+                      >> error ""
                   x -> do
-                      error $ pprint (x :: Dec) ++ " is not a data or newtype definition."
-              _ -> error $ "Cannot generate instances for " ++ show name
+                      traceM (pprint (x :: Dec) ++ " is not a data or newtype definition.") >> error ""
+              _ -> traceM ("Cannot generate instances for " ++ show name) >> error ""
 
 getTypeConstructor :: Type -> Type
 getTypeConstructor (AppT a1 _) = getTypeConstructor a1
@@ -265,7 +267,7 @@ reifyTypeParameters tn = do
                 case info of
                   TyConI (DataD _ _ tvb _ _ _)    -> return $ map getTVBName tvb
                   TyConI (NewtypeD _ _ tvb _ _ _) -> return $ map getTVBName tvb
-                  _                             -> error "impossible case in reifyTypeParameters"
+                  _                             -> traceM "impossible case in reifyTypeParameters" >> error ""
               
 data DecTyType = Data | Newtype | TypeSyn | BuiltIn deriving (Show, Enum, Eq)
 
@@ -277,9 +279,9 @@ decType name = do
               DataD _ _ _ _ _ _   -> return Data
               NewtypeD _ _ _ _ _ _ -> return Newtype
               TySynD _ _ _ -> return TypeSyn
-              _ -> error $ "not a type declaration: " ++ show name
+              _ -> traceM ("not a type declaration: " ++ show name) >> (error "")
            PrimTyConI _ _ _ -> return BuiltIn
-           _ ->  error $ "not a type declaration: " ++ show name 
+           _ ->  traceM ("not a type declaration: " ++ show name ) >> (error "")
 
 
 getTypeNames :: Type -> [Name]
