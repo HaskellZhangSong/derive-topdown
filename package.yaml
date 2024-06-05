@@ -15,8 +15,7 @@ category:            Development
 
 description: This package will make it easier to derive class instance for complex composited data types by using Template Haskell.        
 
-tested-with:   GHC == 8.2.2
-             , GHC == 8.4.4
+tested-with:   GHC == 8.4.4
              , GHC == 8.6.5
              , GHC == 8.8.4
              , GHC == 8.10.7
