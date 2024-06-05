@@ -66,6 +66,8 @@ library:
   - Data.Derive.TopDown
   other-modules:
   - Data.Derive.TopDown.Lib
+  - Data.Derive.TopDown.StandaloneDecGen
+  - Data.Derive.TopDown.InstanceDecGen
 
 tests:
   derive-topdown-test:
