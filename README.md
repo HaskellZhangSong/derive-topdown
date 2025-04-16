@@ -62,9 +62,9 @@ instance Binary a_af4Z => Binary (Department a_af4Z)
 instance Binary a_af4Y => Binary (Company a_af4Y)
 ```
 ## 3. Usage with Template Haskell
-For generating instances with a template Haskell function, `derivingTH`, `derivingTHs` and `derivingTHss` can be used:
+For generating instances with a template Haskell function, `deriving_th`, `deriving_ths` and `deriving_thss` can be used:
 ```haskell
-derivingTHs
+deriving_ths
     [(''ToJSON, deriveToJSON defaultOptions),
     (''FromJSON, deriveFromJSON defaultOptions)]
     ''Company
