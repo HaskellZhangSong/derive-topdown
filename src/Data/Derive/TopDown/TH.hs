@@ -54,7 +54,7 @@ genTH (className, deriveFunction) typeName bs = do
       return $ concat decls ++ decl
 
 deriving_th
-  :: (Name, Name -> Q [Dec]) -- ^ class name and corresponding isntance generation function
+  :: (Name, Name -> Q [Dec]) -- ^ class name and corresponding instance generation function
   -> Name -- ^ type name
   -> Q [Dec]
 deriving_th cd tname = evalStateT (genTH cd tname []) []
