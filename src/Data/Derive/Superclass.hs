@@ -28,6 +28,7 @@ import           Data.List                      ( foldl1'
                                                 , nub
                                                 )
 import           Language.Haskell.TH
+import           Debug.Trace                    (traceM)  
 
 -- Only support class that has paramter with kind * or * -> *
 deriving_superclasses'
@@ -63,9 +64,9 @@ deriving_superclasses' st cn tn = do
               ConT className -> do
                 superclass_decls <- deriving_superclasses' st className tn
                 return superclass_decls
-              x -> error $ "cannot generate class for " ++ show x
+              x -> traceM ("cannot generate class for " ++ show x) >> error ""
           return $ topClassInstance ++ ss
-        _ -> error $ show cn ++ "is not type class"
+        _ -> traceM (show cn ++ "is not type class") >> error ""
 
 {- | Note: It cannot be used with mutual recursive types.
 

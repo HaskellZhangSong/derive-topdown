@@ -119,6 +119,8 @@ templates = TestList
 
 ghcAst = TestList [genericGhcHsModule]
 
+hsExt = TestList [typeArityHsModule, typeArityHsName]
+
 main :: IO ()
 main = do
   void $ runTestTT derive
@@ -126,3 +128,4 @@ main = do
   void $ runTestTT instances
   void $ runTestTT templates
   void $ runTestTT ghcAst
+  void $ runTestTT hsExt

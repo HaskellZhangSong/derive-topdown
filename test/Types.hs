@@ -21,7 +21,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE PackageImports #-}
 
-
 module Types where
 import           Arity
 import           Control.Monad.IO.Class
@@ -35,7 +34,7 @@ import           GHC.Generics            hiding ( C
                                                 , D
                                                 )
 import qualified "haskell-src"  Language.Haskell.Syntax as H
-
+import qualified "haskell-src-exts" Language.Haskell.Exts.Syntax as Hs
 -- types for testing
 
 -- ^ simple cases
@@ -254,11 +253,13 @@ $(deriving_ ''Generic ''P)
 $(deriving_ ''Functor ''P)
 $(deriving_ ''Generic1 ''P)
 $(deriving_th (''TypeArity, makeTypeArity) ''P)
-#if __GLASGOW_HASKELL__ >= 804
-$(deriving_with ''Binary ''E Nothing [] genHoleContext)
-#else
-$(deriving_with ''Binary ''E Nothing [] genInferredContext)
-#endif
+
+$(strategy_deriving anyclass ''Binary ''P)
+-- #if __GLASGOW_HASKELL__ >= 804
+-- $(deriving_with ''Binary ''E Nothing [] genHoleContext)
+-- #else
+-- $(deriving_with ''Binary ''E Nothing [] genInferredContext)
+-- #endif
 
 -- $(instance_with ''Binary ''E  [] Nothing genHoleContext)
 -- GHC deriving does not work on ForallT 
@@ -289,3 +290,5 @@ $(deriving_with ''Generic ''H.HsModule Nothing [''Ratio] genInferredContext)
 $(instance_ ''Binary ''H.HsModule)
 $(deriving_th (''TypeArity, makeTypeArity) ''H.HsModule)
 
+-- ModuleHead
+$(deriving_th (''TypeArity, makeTypeArity) ''Hs.ModuleHead)

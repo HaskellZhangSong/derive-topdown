@@ -6,9 +6,15 @@ import           Control.Monad.IO.Class
 import           Data.Derive.TopDown.IsInstance
 import           Language.Haskell.TH     hiding ( Exp )
 import           Test.HUnit
+import           Arity
 import           Types
 import           Utils
 import qualified "haskell-src"  Language.Haskell.Syntax as H
+import qualified "haskell-src-exts" Language.Haskell.Exts.Syntax as Hs
+import GHC.Core.Opt.Arity (typeArity)
+import Test.HUnit (Test(TestCase))
+import qualified Language.Haskell.Exts as Hs
+
 
 eqPerson = TestCase
   (assertEqual "Person is instance of Eq"
@@ -186,4 +192,16 @@ ordHsDecl = TestCase
   (assertEqual "HsModule is instance of Ord"
                True
                $((qBoolToExp $ isInstance' ''Ord [apps [ConT ''H.HsDecl]]))
+  )
+
+typeArityHsModule = TestCase
+  (assertEqual "type arity of HsModule is 1"
+               True
+               $((qBoolToExp $ isInstance' ''TypeArity [apps [ConT ''Hs.ModuleHead]]))
+  )
+
+typeArityHsName = TestCase
+  (assertEqual "HsName is instance of TypeArity"
+               True
+               $((qBoolToExp $ isInstance' ''TypeArity [apps [ConT ''Hs.Name]]))
   )

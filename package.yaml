@@ -15,8 +15,7 @@ category:            Development
 
 description: This package will make it easier to derive class instance for complex composited data types by using Template Haskell.        
 
-tested-with:   GHC == 8.2.2
-             , GHC == 8.4.4
+tested-with:   GHC == 8.4.4
              , GHC == 8.6.5
              , GHC == 8.8.4
              , GHC == 8.10.7
@@ -26,6 +25,8 @@ tested-with:   GHC == 8.2.2
              , GHC == 9.6.5
              , GHC == 9.8.2
              , GHC == 9.10.1
+             , GHC == 9.12.2
+             , GHC == 9.14.1
 
 dependencies:
 - base >= 4.8 && < 5
@@ -66,6 +67,8 @@ library:
   - Data.Derive.TopDown
   other-modules:
   - Data.Derive.TopDown.Lib
+  - Data.Derive.TopDown.StandaloneDecGen
+  - Data.Derive.TopDown.InstanceDecGen
 
 tests:
   derive-topdown-test:
@@ -97,6 +100,7 @@ tests:
     - derive-topdown
     - HUnit
     - haskell-src
+    - haskell-src-exts
     - binary
     - ghc
     - bytestring
