@@ -34,7 +34,7 @@ import           GHC.Generics            hiding ( C
                                                 , D
                                                 )
 import qualified "haskell-src"  Language.Haskell.Syntax as H
-
+import qualified "haskell-src-exts" Language.Haskell.Exts.Syntax as Hs
 -- types for testing
 
 -- ^ simple cases
@@ -290,3 +290,5 @@ $(deriving_with ''Generic ''H.HsModule Nothing [''Ratio] genInferredContext)
 $(instance_ ''Binary ''H.HsModule)
 $(deriving_th (''TypeArity, makeTypeArity) ''H.HsModule)
 
+-- ModuleHead
+$(deriving_th (''TypeArity, makeTypeArity) ''Hs.ModuleHead)

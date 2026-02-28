@@ -98,6 +98,7 @@ tests:
     - derive-topdown
     - HUnit
     - haskell-src
+    - haskell-src-exts
     - binary
     - ghc
     - bytestring

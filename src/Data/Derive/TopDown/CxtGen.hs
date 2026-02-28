@@ -222,14 +222,19 @@ inferContext tn = do
           return $ S.fromList tn_context'
 
 apply_until_fix_point :: Name -> CIM ()
-apply_until_fix_point tn = do
-  env <- get
-  let tn_fields = fields env ! tn
-  gen_subst tn
-  subst_data_newtype tn
-  env' <- get
-  let tn_fields' = fields env' ! tn
-  if tn_fields == tn_fields' then return () else apply_until_fix_point tn
+apply_until_fix_point tn = go []
+ where
+  go seen = do
+    env <- get
+    let tn_fields = fields env ! tn
+    if tn_fields `elem` seen
+      then return ()
+      else do
+        gen_subst tn
+        subst_data_newtype tn
+        env' <- get
+        let tn_fields' = fields env' ! tn
+        if tn_fields == tn_fields' then return () else go (tn_fields : seen)
 
 -- put fields of data or newtype fields into map
 gen_subst :: Name -> CIM ()
@@ -279,7 +284,7 @@ gen_subst tn = do
 subst_data_newtype :: Name -> CIM ()
 subst_data_newtype tn = do
   env <- get
-  let tn_substs = M.toList $ substitution env ! tn
+  let tn_substs = M.toList $ M.findWithDefault M.empty tn (substitution env)
   forM_ tn_substs $ \(t, t2t) -> case getLeftMostType t of
     ConT ctn -> do
       e <- get
